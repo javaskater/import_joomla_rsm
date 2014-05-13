@@ -21,10 +21,15 @@ if ( class_exists('fgj2wp', false) ) {
 			private $joo_images_directory;
 			public function __construct(){
 				$this->joo_images_directory = ABSPATH . '/wp-content/joo_images';
+				$options = get_option('fgj2wp_options');
+				$this->plugin_options = array();
+				if ( is_array($options) ) {
+					$this->plugin_options = array_merge($this->plugin_options, $options);
+				}
 				add_filter('fgj2wp_get_categories', array(&$this, 'only_rsm_categories'));
 				//the next function will be executed first for the tag fgj2wp_pre_insert_post and receives 2 parameters!!!
 				//http://codex.wordpress.org/Function_Reference/add_filter
-				add_filter('fgj2wp_pre_insert_post', array(&$this, 'create_attachment_from_existing_images'),1,2);
+				//add_filter('fgj2wp_pre_insert_post', array(&$this, 'create_attachment_from_existing_images'),1,2);
 				//add_action('fgj2wp_post_insert_post', array(&$this, 'supprimer_post_non_montreuil'));
 			}
 			public function only_rsm_categories($tab_categories){
@@ -44,7 +49,9 @@ if ( class_exists('fgj2wp', false) ) {
 				$result = $this->import_existing_media($content, $post_date);
 				$post_media = $result['media'];
 				$media_count += $result['media_count'];
-				$content = $this->process_content($content, $post_media);
+				if (sizeof($post_media) > 0){
+					$content = $this->process_content($content, $post_media);
+				}
 				$new_wp_post["post_content"] = $content;
 				return $new_wp_post;
 			}
@@ -161,6 +168,40 @@ if ( class_exists('fgj2wp', false) ) {
 						'media'			=> $media,
 						'media_count'	=> $media_count
 				);
+			}
+			
+			/**
+			 * Copied as is from fg-joomla-to-wordpress because
+			 * defined as private there
+			 * Copy a remote file
+			 * in replacement of the copy function
+			 *
+			 * @param string $url URL of the source file
+			 * @param string $path destination file
+			 * @return boolean
+			 */
+			private function remote_copy($url, $path) {
+					
+				/*
+				 * cwg enhancement: if destination already exists, just return true
+				*  this allows rebuilding the wp media db without moving files
+				*/
+				if ( !$this->plugin_options['force_media_import'] && file_exists($path) && (filesize($path) > 0) ) {
+					return true;
+				}
+					
+				$response = wp_remote_get($url); // Uses WordPress HTTP API
+					
+				if ( is_wp_error($response) ) {
+					trigger_error($response->get_error_message(), E_USER_WARNING);
+					return false;
+				} elseif ( $response['response']['code'] != 200 ) {
+					trigger_error($response['response']['message'], E_USER_WARNING);
+					return false;
+				} else {
+					file_put_contents($path, wp_remote_retrieve_body($response));
+					return true;
+				}
 			}
 			/**
 			 * Check if the attachment exists in the database
