@@ -19,8 +19,11 @@ if ( class_exists('fgj2wp', false) ) {
 	if ( !class_exists('JooRsm', false) ) {
 		class JooRsm extends fgj2wp {
 			private $joo_images_directory;
+			private $post_media = array(); //for each post the array of attachment posts of type images
+			private $media_count = 0; //the total number of images imported !!!
 			public function __construct(){
-				$this->joo_images_directory = ABSPATH . '/wp-content/joo_images';
+				//ABSPATH contains already a / 
+				$this->joo_images_directory = ABSPATH . 'wp-content/uploads/images';
 				$options = get_option('fgj2wp_options');
 				$this->plugin_options = array();
 				if ( is_array($options) ) {
@@ -29,8 +32,9 @@ if ( class_exists('fgj2wp', false) ) {
 				add_filter('fgj2wp_get_categories', array(&$this, 'only_rsm_categories'));
 				//the next function will be executed first for the tag fgj2wp_pre_insert_post and receives 2 parameters!!!
 				//http://codex.wordpress.org/Function_Reference/add_filter
-				//add_filter('fgj2wp_pre_insert_post', array(&$this, 'create_attachment_from_existing_images'),1,2);
-				//add_action('fgj2wp_post_insert_post', array(&$this, 'supprimer_post_non_montreuil'));
+				add_filter('fgj2wp_pre_insert_post', array(&$this, 'create_attachment_from_existing_images'),1,2);
+				//after the post has been inserted we take care of linking the attachments to the parent post !!!
+				add_action('fgj2wp_post_insert_post', array(&$this, 'link_attachment_to_parent_post'),1,2);
 			}
 			public function only_rsm_categories($tab_categories){
 				$tab_filtree = array();
@@ -43,14 +47,15 @@ if ( class_exists('fgj2wp', false) ) {
 				return $tab_filtree;
 			}
 			public function create_attachment_from_existing_images($wp_post, $joo_post){
+				$this->post_media = array();
 				$new_wp_post = $wp_post; //Array copy
 				$post_date = $wp_post["post_date"];
 				$content = $wp_post["post_content"];
 				$result = $this->import_existing_media($content, $post_date);
-				$post_media = $result['media'];
-				$media_count += $result['media_count'];
-				if (sizeof($post_media) > 0){
-					$content = $this->process_content($content, $post_media);
+				$this->post_media = $result['media'];
+				$this->media_count += $result['media_count'];
+				if (sizeof($this->post_media) > 0){
+					$content = $this->process_content($content, $this->post_media);
 				}
 				$new_wp_post["post_content"] = $content;
 				return $new_wp_post;
@@ -222,6 +227,17 @@ if ( class_exists('fgj2wp', false) ) {
 				}
 				else {
 					return false;
+				}
+			}
+			
+			/*It is an action called after the post has been inserted ! It is called here
+			 * again because in the main function there is no media to import
+			 */
+			public function link_attachment_to_parent_post($new_post_id, $post){
+				$new_post = get_post($new_post_id,ARRAY_A);
+				if ( $new_post_id && sizeof($this->post_media) > 0) {
+					// Add links between the post and its medias
+					$this->add_post_media($new_post_id, $new_post, $this->post_media,false);
 				}
 			}
 		}
