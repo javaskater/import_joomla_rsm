@@ -21,7 +21,9 @@ if ( class_exists('fgj2wp', false) ) {
 			private $joo_images_directory;
 			private $post_media = array(); //for each post the array of attachment posts of type images
 			private $media_count = 0; //the total number of images imported !!!
+			private $image_size_in_post;
 			public function __construct(){
+				$this->image_size_in_post = "medium"; //I want all the image in posts to be medium size !!!!
 				//ABSPATH contains already a / 
 				$this->joo_images_directory = ABSPATH . 'wp-content/uploads/images';
 				$options = get_option('fgj2wp_options');
@@ -179,11 +181,35 @@ if ( class_exists('fgj2wp', false) ) {
 			 * Restore the links in the content and replace them with the new calculated link
 			 *
 			 * @param array $matches Result of the preg_match
-			 * @return string Replacement
+			 * @return string Replacement the link with an a href around id !!!
 			 */
 			private function restore_links($matches) {
 				$link = $this->post_link[$matches[1]];
 				$new_link = array_key_exists('new_link', $link)? $link['new_link'] : $link['old_link'];
+				$pattern = "/<img(.*?)src=('|\")(.*?).(bmp|gif|jpeg|jpg|png)('|\")(.*?)>/i";
+				$image_joolink = $link["old_link"];
+				if(preg_match($pattern,$image_joolink,$joolink_matches)){
+					$joo_image_path = $joolink_matches[3].".".$joolink_matches[4];
+					$wp_link = $new_link;
+					foreach ( $this->post_media as $old_filename => $media ) {
+						if($old_filename == $joo_image_path){
+							$post_media_name = $media['name'];
+							$attachment = $this->get_attachment_from_name($post_media_name);
+							//http://codex.wordpress.org/Function_Reference/get_post_meta
+							$meta_values = get_post_meta($attachment->ID, "_wp_attachment_metadata", false );
+							$wp_link_pattern = "/<img(.*?)class=('|\")(.*?)('|\") src=('|\")(.*?).(bmp|gif|jpeg|jpg|png)('|\")(.*?)>/i";
+							if(preg_match($wp_link_pattern,$wp_link,$wp_link_matches)){
+								$new_class = preg_replace ( "/size\-[a-z]+/" , "size-".$this->image_size_in_post,$wp_link_matches[3]);
+								$wp_full_img_link = $wp_link_matches[6].".".$wp_link_matches[7];
+								$wp_thumb_img_link = preg_replace ( "/[^\/]+$/" , $meta_values[0]["sizes"]["medium"]["file"] ,$wp_full_img_link);
+								$wp_image = "<img class=\"".$new_class."\" src=\"".$wp_thumb_img_link."\" alt=\"".$attachment->post_title."\" title=\"".$attachment->post_title."\"";
+								$wp_image .= " width=\"".$meta_values[0]["sizes"]["medium"]["width"]."\" height = \"".$meta_values[0]["sizes"]["medium"]["height"]."\" />";
+								$new_link = "<a href=\"".$wp_full_img_link."\">".$wp_image."</a>";
+							}
+							break;
+						}
+					}
+				}
 				return $new_link;
 			}
 			
