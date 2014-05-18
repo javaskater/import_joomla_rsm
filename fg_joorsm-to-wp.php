@@ -176,6 +176,18 @@ if ( class_exists('fgj2wp', false) ) {
 			}
 			
 			/**
+			 * Restore the links in the content and replace them with the new calculated link
+			 *
+			 * @param array $matches Result of the preg_match
+			 * @return string Replacement
+			 */
+			private function restore_links($matches) {
+				$link = $this->post_link[$matches[1]];
+				$new_link = array_key_exists('new_link', $link)? $link['new_link'] : $link['old_link'];
+				return $new_link;
+			}
+			
+			/**
 			 * Copied as is from fg-joomla-to-wordpress because
 			 * defined as private there
 			 * Copy a remote file
@@ -232,12 +244,15 @@ if ( class_exists('fgj2wp', false) ) {
 			
 			/*It is an action called after the post has been inserted ! It is called here
 			 * again because in the main function there is no media to import
+			 * $new_post_id is the ID of the attachment
+			 * $post, is the post with the text, the parent post!!!
 			 */
 			public function link_attachment_to_parent_post($new_post_id, $post){
-				$new_post = get_post($new_post_id,ARRAY_A);
-				if ( $new_post_id && sizeof($this->post_media) > 0) {
+				$the_post_parent = get_post($new_post_id,ARRAY_A);
+				if ( $new_post_id > 0 && $the_post_parent["post_parent"] == 0 && $the_post_parent["post_type"] == 'post' && sizeof($this->post_media) > 0) {
 					// Add links between the post and its medias
-					$this->add_post_media($new_post_id, $new_post, $this->post_media,false);
+					$this->add_post_media($new_post_id, $the_post_parent, $this->post_media,false);
+					$this->post_media = array();
 				}
 			}
 		}
