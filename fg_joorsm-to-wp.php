@@ -181,7 +181,7 @@ if ( class_exists('fgj2wp', false) ) {
 			 * Restore the links in the content and replace them with the new calculated link
 			 *
 			 * @param array $matches Result of the preg_match
-			 * @return string Replacement the link with an a href around id !!!
+			 * @return string Replacement the link with an a href around id except when an icon!!!
 			 */
 			private function restore_links($matches) {
 				$link = $this->post_link[$matches[1]];
@@ -197,14 +197,17 @@ if ( class_exists('fgj2wp', false) ) {
 							$attachment = $this->get_attachment_from_name($post_media_name);
 							//http://codex.wordpress.org/Function_Reference/get_post_meta
 							$meta_values = get_post_meta($attachment->ID, "_wp_attachment_metadata", false );
+							$thumb_metas = $meta_values[0]["sizes"][$this->image_size_in_post];
 							$wp_link_pattern = "/<img(.*?)class=('|\")(.*?)('|\") src=('|\")(.*?).(bmp|gif|jpeg|jpg|png)('|\")(.*?)>/i";
 							if(preg_match($wp_link_pattern,$wp_link,$wp_link_matches)){
-								$new_class = preg_replace ( "/size\-[a-z]+/" , "size-".$this->image_size_in_post,$wp_link_matches[3]);
 								$wp_full_img_link = $wp_link_matches[6].".".$wp_link_matches[7];
-								$wp_thumb_img_link = preg_replace ( "/[^\/]+$/" , $meta_values[0]["sizes"]["medium"]["file"] ,$wp_full_img_link);
-								$wp_image = "<img class=\"".$new_class."\" src=\"".$wp_thumb_img_link."\" alt=\"".$attachment->post_title."\" title=\"".$attachment->post_title."\"";
-								$wp_image .= " width=\"".$meta_values[0]["sizes"]["medium"]["width"]."\" height = \"".$meta_values[0]["sizes"]["medium"]["height"]."\" />";
-								$new_link = "<a href=\"".$wp_full_img_link."\">".$wp_image."</a>";
+								if($thumb_metas["file"] != null && sizeof($thumb_metas["file"]) > 0 && $thumb_metas["file"] !=  $wp_full_img_link){//only if it is not an icon !!! (the Icon are used for links!!!)
+									$new_class = preg_replace ( "/size\-[a-z]+/" , "size-".$this->image_size_in_post,$wp_link_matches[3]);
+									$wp_thumb_img_link = preg_replace ( "/[^\/]+$/" , $meta_values[0]["sizes"]["medium"]["file"] ,$wp_full_img_link);
+									$wp_image = "<img class=\"".$new_class."\" src=\"".$wp_thumb_img_link."\" alt=\"".$attachment->post_title."\" title=\"".$attachment->post_title."\"";
+									$wp_image .= " width=\"".$thumb_metas["width"]."\" height = \"".$thumb_metas["height"]."\" />";
+									$new_link = "<a href=\"".$wp_full_img_link."\">".$wp_image."</a>";
+								}
 							}
 							break;
 						}
