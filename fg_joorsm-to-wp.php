@@ -178,6 +178,45 @@ if ( class_exists('fgj2wp', false) ) {
 			}
 			
 			/**
+			 * Remove all the links from the content and replace them with a specific tag
+			 * I want to update the post_tile wih the alt!!!!
+			 * @param array $matches Result of the preg_match
+			 * @return string Replacement
+			 */
+			private function remove_links($matches) {
+				$joo_link_or_image = $matches[0];
+				$joo_link_pattern = "/<img(.*)src=\"([^\"]*)\"(.*)(alt=\"([^\"]*)\")(.*)(title=\"([^\"]*)\")(.*)\/>/i";
+				if(preg_match($joo_link_pattern,$matches[0],$joolink_matches)){
+					$nb_joolinks_matches = sizeof($joolink_matches);
+					if ($nb_joolinks_matches > 8){ //we have a title and an alt
+						$this->post_link[] = array('old_link' => $joo_link_or_image,
+						'old_title' => $joolink_matches[8],
+						'old_alt' => $joolink_matches[5]);
+					}elseif ($nb_joolinks_matches > 5) { //we only have an alt
+						$this->post_link[] = array('old_link' => $joo_link_or_image,
+								'old_alt' => $joolink_matches[5]);
+					}else{
+						$this->post_link[] = array('old_link' => $joo_link_or_image);
+					}
+				}else{ //We have title alone
+					$joo_link_pattern = "/<img(.*)src=\"([^\"]*)\"(.*)(title=\"([^\"]*)\")(.*)\/>/i";
+					if(preg_match($joo_link_pattern,$matches[0],$joolink_matches)){
+						$nb_joolinks_matches = sizeof($joolink_matches);
+						if ($nb_joolinks_matches > 5){ //we have a title and an alt
+							$this->post_link[] = array('old_link' => $joo_link_or_image,
+									'old_title' => $joolink_matches[5],
+									'old_alt' => $joolink_matches[5]);
+						}else{
+							$this->post_link[] = array('old_link' => $joo_link_or_image);
+						}
+					}else{ //no title, no alt !!!
+							$this->post_link[] = array('old_link' => $joo_link_or_image);
+					}
+				}
+				return '__fg_link_' . $this->post_link_count++ . '__';
+			}
+			
+			/**
 			 * Restore the links in the content and replace them with the new calculated link
 			 *
 			 * @param array $matches Result of the preg_match
@@ -195,6 +234,18 @@ if ( class_exists('fgj2wp', false) ) {
 						if($old_filename == $joo_image_path){
 							$post_media_name = $media['name'];
 							$attachment = $this->get_attachment_from_name($post_media_name);
+							$update_media = false;
+							if($link['old_title'] && sizeof($link['old_title']) > 0){
+								$attachment->post_title = $link['old_title'];
+								$update_media = true;
+							}
+							if($link['old_alt'] && sizeof($link['old_alt']) > 0){
+								$attachment->post_excerpt = $link['old_alt'];
+								$update_media = true;
+							}
+							if ($update_media){
+								wp_update_post( $attachment );
+							}
 							//http://codex.wordpress.org/Function_Reference/get_post_meta
 							$meta_values = get_post_meta($attachment->ID, "_wp_attachment_metadata", false );
 							$thumb_metas = $meta_values[0]["sizes"][$this->image_size_in_post];
@@ -204,7 +255,7 @@ if ( class_exists('fgj2wp', false) ) {
 								if($thumb_metas["file"] != null && sizeof($thumb_metas["file"]) > 0 && $thumb_metas["file"] !=  $wp_full_img_link){//only if it is not an icon !!! (the Icon are used for links!!!)
 									$new_class = preg_replace ( "/size\-[a-z]+/" , "size-".$this->image_size_in_post,$wp_link_matches[3]);
 									$wp_thumb_img_link = preg_replace ( "/[^\/]+$/" , $meta_values[0]["sizes"]["medium"]["file"] ,$wp_full_img_link);
-									$wp_image = "<img class=\"".$new_class."\" src=\"".$wp_thumb_img_link."\" alt=\"".$attachment->post_title."\" title=\"".$attachment->post_title."\"";
+									$wp_image = "<img class=\"".$new_class."\" src=\"".$wp_thumb_img_link."\" alt=\"".$attachment->post_excerpt."\" title=\"".$attachment->post_title."\"";
 									$wp_image .= " width=\"".$thumb_metas["width"]."\" height = \"".$thumb_metas["height"]."\" />";
 									$new_link = "<a href=\"".$wp_full_img_link."\">".$wp_image."</a>";
 								}
