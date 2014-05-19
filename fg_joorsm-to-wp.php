@@ -229,7 +229,7 @@ if ( class_exists('fgj2wp', false) ) {
 				$image_joolink = $link["old_link"];
 				if(preg_match($pattern,$image_joolink,$joolink_matches)){
 					$joo_image_path = $joolink_matches[3].".".$joolink_matches[4];
-					$wp_link = $new_link;
+					$wp_link = preg_replace("/http:\/\/[^\/]+/", "[url]" , $new_link);//we replace the base ur with the [url] shortcode
 					foreach ( $this->post_media as $old_filename => $media ) {
 						if($old_filename == $joo_image_path){
 							$post_media_name = $media['name'];
