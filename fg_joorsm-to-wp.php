@@ -35,6 +35,8 @@ if ( class_exists('fgj2wp', false) ) {
 				//the next function will be executed first for the tag fgj2wp_pre_insert_post and receives 2 parameters!!!
 				//http://codex.wordpress.org/Function_Reference/add_filter
 				add_filter('fgj2wp_pre_insert_post', array(&$this, 'create_attachment_from_existing_images'),1,2);
+				//this function will be called after to replace the rsm Joomla Gallerie with the WP shortcode ...
+				add_filter('fgj2wp_pre_insert_post', array(&$this, 'replace_joo_galleries'),2,2);
 				//after the post has been inserted we take care of linking the attachments to the parent post !!!
 				add_action('fgj2wp_post_insert_post', array(&$this, 'link_attachment_to_parent_post'),1,2);
 			}
@@ -61,6 +63,28 @@ if ( class_exists('fgj2wp', false) ) {
 				}
 				$new_wp_post["post_content"] = $content;
 				return $new_wp_post;
+			}
+			
+			/*
+			 * pre-processing the content
+			 * replaces all shortcodes {gallery width=100}stories/randosport/MesnieresAvril2014{/gallery}
+			 * with [JooGallery path='stories/randosport/MesnieresAvril2014']
+			 */
+			public function replace_joo_galleries($wp_post, $joo_post){
+				$new_wp_post = $wp_post; //Array copy
+				$content = $wp_post["post_content"];
+				$pattern_joo_gallery = "/{gallery(.*)?}(.*){\/gallery}/i";
+				$content = preg_replace_callback($pattern_joo_gallery, array($this, 'replace_one_joo_gallery'), $content);
+				$new_wp_post["post_content"] = $content;
+				return $new_wp_post;
+			}
+			
+			private function replace_one_joo_gallery($found_joo_gallery_pattern){
+				if(sizeof($found_joo_gallery_pattern) > 2){
+					return "[JooGallery path='".$found_joo_gallery_pattern[2]."']";
+				}else{ //we do nothing we return as is
+					$found_joo_gallery_pattern[0];
+				}
 			}
 			
 			private function import_existing_media($content, $post_date) {
