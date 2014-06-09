@@ -20,6 +20,7 @@ if ( class_exists('fgj2wp', false) ) {
 		class JooRsm extends fgj2wp {
 			private $joo_images_directory;
 			private $post_media = array(); //for each post the array of attachment posts of type images
+			private $imported_users = array(); //Users I get From the Joomla database
 			private $media_count = 0; //the total number of images imported !!!
 			private $image_size_in_post;
 			public function __construct(){
@@ -31,6 +32,13 @@ if ( class_exists('fgj2wp', false) ) {
 				if ( is_array($options) ) {
 					$this->plugin_options = array_merge($this->plugin_options, $options);
 				}
+				//add the users info columns added to the information brought back from the Joomla Post
+				add_filter('fgj2wp_get_posts_add_extra_cols', array(&$this, 'add_info_user_to_posts'));
+				//Create WP USers with the same ID as Joo Users and store the generated Password in a usermeta
+				add_action('fgj2wp_pre_import', array(&$this, 'import_joo_users_in_wp'),1);
+				//If I delete all, I delete the imported Joomla users ... action=all only parameter
+				add_action('fgj2wp_post_empty_database', array(&$this, 'delete_joo_users_in_wp'),1,1);
+				//I only find the rsm categories the others Post will get 1 as category
 				add_filter('fgj2wp_get_categories', array(&$this, 'only_rsm_categories'));
 				//the next function will be executed first for the tag fgj2wp_pre_insert_post and receives 2 parameters!!!
 				//http://codex.wordpress.org/Function_Reference/add_filter
@@ -39,6 +47,96 @@ if ( class_exists('fgj2wp', false) ) {
 				add_filter('fgj2wp_pre_insert_post', array(&$this, 'replace_joo_galleries'),2,2);
 				//after the post has been inserted we take care of linking the attachments to the parent post !!!
 				add_action('fgj2wp_post_insert_post', array(&$this, 'link_attachment_to_parent_post'),1,2);
+			}
+			public function add_info_user_to_posts(){
+				return ", p.created_by, p.created_by_alias ";
+			}
+			public function delete_joo_users_in_wp($action){
+				global $wpdb;
+				$result = true;
+				if($action == 'all'){
+					$sql_joo_users = "select user_id FROM $wpdb->usermeta where meta_key='joomlaid' order by user_id desc;";
+					$joo_wp_users = $wpdb->get_results($sql_joo_users);
+					if(count($joo_wp_users) > 0){
+						//now we supress the user himself
+						foreach ( $joo_wp_users as $joo_wp_user ) {
+							$id_to_delete = $joo_wp_user->user_id;
+							//We suppress all the meta datas of the previously Joomla users
+							$sql_meta_query = "DELETE FROM $wpdb->usermeta where user_id = $id_to_delete";
+							$result &= $wpdb->query($sql_meta_query);
+							$sql_delete_user = "DELETE FROM $wpdb->users where ID= $id_to_delete";
+							$result &= $wpdb->query($sql_delete_user);
+						}
+					}
+				}
+				return $result;
+			}
+			public function import_joo_users_in_wp(){
+				global $joomla_db;
+				$joo_prefix = $this->plugin_options['prefix'];
+				$joo_users = array();
+				$sql = "SELECT id, name, username, email, password, usertype FROM " . $joo_prefix . "users WHERE block = 0 ";
+				$query = $joomla_db->query($sql);
+				if ( is_object($query) ) {
+					foreach ( $query as $row ) {
+						$joo_users[] = array(
+                          'id'       => $row['id'],
+                          'name'     => $row['name'],
+                          'username' => $row['username'],
+                          'email'    => $row['email'],
+                          'password' => $row['password'],
+                          'usertype' => $row['usertype']
+                          );
+					}
+				}
+				$this->display_admin_notice(sprintf('%d joomla users found we must insert them...', count($joo_users)));
+				$indx = 0;
+				foreach ( $joo_users as $joomla_user )
+				{
+					$this->imported_users[$indx]['joo_id'] = $joomla_user['id'];
+					$user_id = username_exists( $joomla_user['username'] );
+					if ( $user_id )
+					{
+						$this->imported_users[$indx]['wp_id'] = $user_id;
+						$this->display_admin_notice(sprintf('WARNING:  This username  (%s) already exists - it won\'t be added !!!',$joomla_user['username']));
+					}
+					else
+					{
+						if ( email_exists($joomla_user['email']) AND !empty($joomla_user['email']) )
+						{
+							$this->display_admin_notice(sprintf('WARNING:  This users email address (%s) already exists - User (%s) can not be added !!!',$joomla_user['email'],$joomla_user['username']));
+						}
+						else
+						{
+							$random_password = wp_generate_password( 12, false );
+							if ( empty($joomla_user['email']) )
+								$ret = wp_create_user( $joomla_user['username'], $random_password);
+							else
+								$ret = wp_create_user( $joomla_user['username'], $random_password, $joomla_user['email'] );
+							$this->imported_users[$indx]['wp_id'] = $ret;
+				
+							// set user meta data joomlapass for first login
+							add_user_meta( $ret, 'joomlapass', $joomla_user['password'] );
+							add_user_meta( $ret, 'wpgeneratedpass', $random_password );
+							add_user_meta( $ret, 'joomlaid', $joomla_user['id'] );
+							//http://wordpress.stackexchange.com/questions/4725/how-to-change-a-users-role
+							if($joomla_user['usertype'] == 'Publisher'){
+								$u = new WP_User( $ret );
+								// Remove role
+								$u->remove_role( 'subscriber' );
+								// Add role
+								$u->add_role( 'author' );
+							}elseif($joomla_user['usertype'] == 'Editor'){
+								$u = new WP_User( $ret );
+								// Remove role
+								$u->remove_role( 'subscriber' );
+								// Add role
+								$u->add_role( 'editor' );
+							}
+						}
+					}
+					$indx++;
+				}
 			}
 			public function only_rsm_categories($tab_categories){
 				$tab_filtree = array();
