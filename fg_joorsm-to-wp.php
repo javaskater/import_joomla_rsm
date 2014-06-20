@@ -43,8 +43,10 @@ if ( class_exists('fgj2wp', false) ) {
 				//the next function will be executed first for the tag fgj2wp_pre_insert_post and receives 2 parameters!!!
 				//http://codex.wordpress.org/Function_Reference/add_filter
 				add_filter('fgj2wp_pre_insert_post', array(&$this, 'create_attachment_from_existing_images'),1,2);
+				//this function will be called after associate the Joomla USer with the WP article ...
+				add_filter('fgj2wp_pre_insert_post', array(&$this, 'associate_joo_user_with_article'),2,2);
 				//this function will be called after to replace the rsm Joomla Gallerie with the WP shortcode ...
-				add_filter('fgj2wp_pre_insert_post', array(&$this, 'replace_joo_galleries'),2,2);
+				add_filter('fgj2wp_pre_insert_post', array(&$this, 'replace_joo_galleries'),3,2);
 				//after the post has been inserted we take care of linking the attachments to the parent post !!!
 				add_action('fgj2wp_post_insert_post', array(&$this, 'link_attachment_to_parent_post'),1,2);
 			}
@@ -160,6 +162,25 @@ if ( class_exists('fgj2wp', false) ) {
 					$content = $this->process_content($content, $this->post_media);
 				}
 				$new_wp_post["post_content"] = $content;
+				return $new_wp_post;
+			}
+			
+			/*
+			 * Before importing the posts WP Users have been created out of Joo Users
+			 * there are in $this->users now it is time to associate the ex Joo USer with its article
+			 */
+			public function associate_joo_user_with_article($wp_post, $joo_post){
+				$JooWPusers= $this->imported_users;
+				$new_wp_post = $wp_post; //Array copy
+				$id_joo_user = $joo_post['created_by'];
+				foreach ($JooWPusers as $JooWPuser){
+					//Find the Joo_User of $joo_post and associate its corresponding wp_user_id with $new_wp_post
+					if($JooWPuser['joo_id'] == $id_joo_user){
+						$id_wp_user = $JooWPuser['wp_id'];
+						$new_wp_post['post_author'] = $id_wp_user;
+						break;
+					}
+				}
 				return $new_wp_post;
 			}
 			
