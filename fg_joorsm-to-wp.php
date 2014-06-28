@@ -33,11 +33,13 @@ if ( class_exists('fgj2wp', false) ) {
 					$this->plugin_options = array_merge($this->plugin_options, $options);
 				}
 				//add the users info columns added to the information brought back from the Joomla Post
-				add_filter('fgj2wp_get_posts_add_extra_cols', array(&$this, 'add_info_user_to_posts'));
+				add_filter('fgj2wp_get_posts_add_extra_cols', array(&$this, 'add_info_user_and_stats_to_posts'));
 				//Create WP USers with the same ID as Joo Users and store the generated Password in a usermeta
 				add_action('fgj2wp_pre_import', array(&$this, 'import_joo_users_in_wp'),1);
 				//If I delete all, I delete the imported Joomla users ... action=all only parameter
 				add_action('fgj2wp_post_empty_database', array(&$this, 'delete_joo_users_in_wp'),1,1);
+				//If I delete all, I delete the imported Joomla users ... action=all only parameter
+				add_action('fgj2wp_post_empty_database', array(&$this, 'delete_joo_stats_in_wp'),1,1);
 				//I only find the rsm categories the others Post will get 1 as category
 				add_filter('fgj2wp_get_categories', array(&$this, 'only_rsm_categories'));
 				//the next function will be executed first for the tag fgj2wp_pre_insert_post and receives 2 parameters!!!
@@ -49,9 +51,11 @@ if ( class_exists('fgj2wp', false) ) {
 				add_filter('fgj2wp_pre_insert_post', array(&$this, 'replace_joo_galleries'),3,2);
 				//after the post has been inserted we take care of linking the attachments to the parent post !!!
 				add_action('fgj2wp_post_insert_post', array(&$this, 'link_attachment_to_parent_post'),1,2);
+				//after the post has been inserted we take care getting the users stats from Joomla !!!
+				add_action('fgj2wp_post_insert_post', array(&$this, 'add_user_stats_from_joomla'),2,2);
 			}
-			public function add_info_user_to_posts(){
-				return ", p.created_by, p.created_by_alias ";
+			public function add_info_user_and_stats_to_posts(){
+				return ", p.created_by, p.created_by_alias, p.hits ";
 			}
 			public function delete_joo_users_in_wp($action){
 				global $wpdb;
@@ -70,6 +74,29 @@ if ( class_exists('fgj2wp', false) ) {
 							$result &= $wpdb->query($sql_delete_user);
 						}
 					}
+				}
+				return $result;
+			}
+			public function delete_joo_stats_in_wp($action){
+				global $wpdb;
+				$result = true;
+				$sql_delete_userstats_count = "";
+				if($action == 'all'){
+					$sql_delete_userstats_count = $wpdb->prepare("DELETE FROM %s;",$wpdb->get_blog_prefix().'userstats_count');
+					
+				}else{
+					$start_id = intval(get_option('fgj2wp_start_id'));
+					//the same kinf of delete statement as for comments
+					$sql_delete_userstats_count = $wpdb->prepare("DELETE FROM %s WHERE post_id IN (
+		SELECT ID FROM %s
+		WHERE (post_type IN ('post', 'page', 'attachment', 'revision')
+		OR post_status = 'trash'
+		OR post_title = 'Brouillon auto'
+		AND ID >= %d
+		))",$wpdb->get_blog_prefix().'userstats_count',$wpdb->posts,$start_id);
+				}
+				if (!$wpdb->query($userstats_request)){
+					$this->display_admin_error(sprintf('la requete de nettayage des stats:%s a eu un probleme', $sql_delete_userstats_count));
 				}
 				return $result;
 			}
@@ -477,6 +504,26 @@ if ( class_exists('fgj2wp', false) ) {
 					$this->add_post_media($new_post_id, $the_post_parent, $this->post_media,false);
 					$this->post_media = array();
 				}
+			}
+			/*It is an action called after the post has been inserted ! It is called here
+			 * again because we want to get the Joomla clics stats in our WP Blog
+			 * We have previously activated the http://wordpress.org/plugins/user-stats/
+			*/
+			public function add_user_stats_from_joomla($new_post_id, $post){
+				global $wpdb;
+				$the_post_I_want_to_add_stats_to = get_post($new_post_id,ARRAY_A);
+				$joo_post = $post;
+				$nbe_clicks = $post["hits"];
+				//http://codex.wordpress.org/Function_Reference/add_post_meta
+				if (!add_post_meta($new_post_id, '_statz_count', $nbe_clicks, true)){
+					$this->display_admin_error(sprintf('la metadonnee _statz_count pour le post de id: %d a pete correctement creee', $new_post_id));
+				}
+				//http://codex.wordpress.org/Class_Reference/wpdb && http://stackoverflow.com/questions/8566603/wordpress-wpdb-insert-mysql-now
+				$userstats_request = $wpdb->prepare("INSERT INTO %s (`date`,`post_id`,`count`) VALUES ('%s',%d,%d)", $wpdb->get_blog_prefix().'userstats_count', current_time('mysql', 1), $new_post_id, $nbe_clicks);
+				if (!$wpdb->query($userstats_request)){
+					$this->display_admin_error(sprintf('pour le post de id: %d la table %s a pas  pu etre mise a jour', $new_post_id, $wpdb->get_blog_prefix().'userstats_count'));
+				}
+				return 0;
 			}
 		}
 	}
