@@ -82,21 +82,21 @@ if ( class_exists('fgj2wp', false) ) {
 				$result = true;
 				$sql_delete_userstats_count = "";
 				if($action == 'all'){
-					$sql_delete_userstats_count = $wpdb->prepare("DELETE FROM %s;",$wpdb->get_blog_prefix().'userstats_count');
+					$sql_delete_userstats_count = sprintf("DELETE FROM %s",$wpdb->get_blog_prefix()."userstats_count");
 					
 				}else{
 					$start_id = intval(get_option('fgj2wp_start_id'));
 					//the same kinf of delete statement as for comments
-					$sql_delete_userstats_count = $wpdb->prepare("DELETE FROM %s WHERE post_id IN (
+					$sql_delete_userstats_count = $wpdb->prepare("DELETE FROM ".$wpdb->get_blog_prefix()."userstats_count WHERE post_id IN (
 		SELECT ID FROM %s
 		WHERE (post_type IN ('post', 'page', 'attachment', 'revision')
 		OR post_status = 'trash'
 		OR post_title = 'Brouillon auto'
 		AND ID >= %d
-		))",$wpdb->get_blog_prefix().'userstats_count',$wpdb->posts,$start_id);
+		))", $wpdb->posts,$start_id);
 				}
-				if (!$wpdb->query($userstats_request)){
-					$this->display_admin_error(sprintf('la requete de nettayage des stats:%s a eu un probleme', $sql_delete_userstats_count));
+				if (!$wpdb->query($sql_delete_userstats_count)){
+					$this->display_admin_error(sprintf('la requete de nettoyage des stats:%s a eu un probleme', $sql_delete_userstats_count));
 				}
 				return $result;
 			}
@@ -519,7 +519,7 @@ if ( class_exists('fgj2wp', false) ) {
 					$this->display_admin_error(sprintf('la metadonnee _statz_count pour le post de id: %d a pete correctement creee', $new_post_id));
 				}
 				//http://codex.wordpress.org/Class_Reference/wpdb && http://stackoverflow.com/questions/8566603/wordpress-wpdb-insert-mysql-now
-				$userstats_request = $wpdb->prepare("INSERT INTO %s (`date`,`post_id`,`count`) VALUES ('%s',%d,%d)", $wpdb->get_blog_prefix().'userstats_count', current_time('mysql', 1), $new_post_id, $nbe_clicks);
+				$userstats_request = $wpdb->prepare("INSERT INTO ".$wpdb->get_blog_prefix()."userstats_count (`date`,`post_id`,`count`) VALUES ('%s',%d,%d)", current_time('mysql', 1), $new_post_id, $nbe_clicks);
 				if (!$wpdb->query($userstats_request)){
 					$this->display_admin_error(sprintf('pour le post de id: %d la table %s a pas  pu etre mise a jour', $new_post_id, $wpdb->get_blog_prefix().'userstats_count'));
 				}
