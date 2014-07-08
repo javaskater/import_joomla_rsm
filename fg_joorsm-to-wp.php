@@ -528,21 +528,61 @@ if ( class_exists('fgj2wp', false) ) {
 			public function replace_joo_maps_in_posts($wp_post, $joo_post){
 				$new_wp_post = $wp_post; //Array copy
 				$content = $wp_post["post_content"];
-				$pattern_joo_google_maps = "/{mosmap lat=\'([0-9\.]+)\'|lon=\'([0-9\.]+)\'|(.*)}/i";
+				$pattern_joo_google_maps = "/{mosmap lat=\'([0-9\.]+)\'\|lon=\'([0-9\.]+)\'\|([^}]*)}/i";
 				$content = preg_replace_callback($pattern_joo_google_maps, array($this, 'replace_one_joo_map_in_post'), $content);
 				$new_wp_post["post_content"] = $content;
 				return $new_wp_post;
 			}
-			private function replace_one_joo_map_in_post($found_joo_googlemap_pattern){
+			protected function replace_one_joo_map_in_post($found_joo_googlemap_pattern){
 				if(sizeof($found_joo_googlemap_pattern) > 3){
 					$latitude = $found_joo_googlemap_pattern[1];
 					$longitude = $found_joo_googlemap_pattern[2];
 					$translated_map = "[flexiblemap center=\"".$latitude.",".$longitude."\"";
 					$other_attributes_joostr = $found_joo_googlemap_pattern[3];
-					$other_attributes = array();
+					$other_attributes = array("width"=>"100%", "height"=>"400px","zoom"=>9,"title"=>"Rendez-vous", "description"=>"---", "link"=>null);
+					$pattern = "/lbxwidth=\'([0-9]+px)\'/";
+					$matches = array();
+					if (preg_match($pattern, $other_attributes_joostr, $matches, PREG_OFFSET_CAPTURE)){
+						$other_attributes["width"] = $matches[1][0];
+					}
+					$pattern = "/lbxheight=\'([0-9]+px)\'/";
+					if (preg_match($pattern, $other_attributes_joostr, $matches, PREG_OFFSET_CAPTURE)){
+						$other_attributes["height"] = $matches[1][0];
+					}
+					$pattern = "/zoom=\'([0-9]+)\'/";
+					if (preg_match($pattern, $other_attributes_joostr, $matches, PREG_OFFSET_CAPTURE)){
+						$other_attributes["zoom"] = $matches[1][0];
+					}
+					$pattern = "/text=\'([^\']+)\'/";
+					if (preg_match($pattern, $other_attributes_joostr, $matches, PREG_OFFSET_CAPTURE)){
+						$this->translate_description_from_joo_to_wp($matches[1][0],$other_attributes);
+					}
+					foreach ($other_attributes as $the_wp_attribute=>$its_wp_value){
+						$translated_map .= " ".$the_wp_attribute."=\"".$its_wp_value."\"";
+					}
 					$translated_map .= "]";
+					return $translated_map;
 				}else{ //we do nothing we return as is
-					$found_joo_googlemap_pattern[0];
+					return $found_joo_googlemap_pattern[0];
+				}
+			}
+			protected function translate_description_from_joo_to_wp($joo_description, &$attributes_for_wordpress){
+				$pattern_link_more_info = "/<a href=\"([^\"]+)\"[^>]+>[^<]+<\/a>/mi";
+				$description_without_tags = null;
+				//http://php.net/manual/en/function.preg-replace.php see examples at the end
+				$description_without_link = preg_replace ( $pattern_link_more_info , "" , $joo_description);
+				if($description_without_link != null && count($description_without_link) > 0){
+					$description_without_opening_tags = preg_replace ( "/<[a-z]+[^>]*>/im" , "" , $description_without_link);
+					if($description_without_opening_tags != null && count($description_without_opening_tags) > 0){
+					$description_without_tags = preg_replace ( "/<\/[a-z]+>/i" , "" , $description_without_opening_tags);
+						if($description_without_tags != null && count($description_without_tags) > 0){
+							$attributes_for_wordpress["description"] = $description_without_tags;
+						}
+					}
+				}
+				$found_links = array();
+				if (preg_match($pattern_link_more_info, $joo_description, $found_links, PREG_OFFSET_CAPTURE) && count($found_links) > 1){
+					$attributes_for_wordpress["link"] = $found_links[1][0];
 				}
 			}
 		}
