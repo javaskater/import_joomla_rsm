@@ -49,6 +49,8 @@ if ( class_exists('fgj2wp', false) ) {
 				add_filter('fgj2wp_pre_insert_post', array(&$this, 'associate_joo_user_with_article'),2,2);
 				//this function will be called after to replace the rsm Joomla Gallerie with the WP shortcode ...
 				add_filter('fgj2wp_pre_insert_post', array(&$this, 'replace_joo_galleries'),3,2);
+				//this function will be called after to replace the Joo Google Maps Short code  with the WP shortcode ...
+				add_filter('fgj2wp_pre_insert_post', array(&$this, 'replace_joo_maps_in_posts'),4,2);
 				//after the post has been inserted we take care of linking the attachments to the parent post !!!
 				add_action('fgj2wp_post_insert_post', array(&$this, 'link_attachment_to_parent_post'),1,2);
 				//after the post has been inserted we take care getting the users stats from Joomla !!!
@@ -87,13 +89,7 @@ if ( class_exists('fgj2wp', false) ) {
 				}else{
 					$start_id = intval(get_option('fgj2wp_start_id'));
 					//the same kinf of delete statement as for comments
-					$sql_delete_userstats_count = $wpdb->prepare("DELETE FROM ".$wpdb->get_blog_prefix()."userstats_count WHERE post_id IN (
-		SELECT ID FROM %s
-		WHERE (post_type IN ('post', 'page', 'attachment', 'revision')
-		OR post_status = 'trash'
-		OR post_title = 'Brouillon auto'
-		AND ID >= %d
-		))", $wpdb->posts,$start_id);
+					$sql_delete_userstats_count = $wpdb->prepare("DELETE FROM ".$wpdb->get_blog_prefix()."userstats_count WHERE post_id IN (SELECT ID FROM ".$wpdb->get_blog_prefix()."posts WHERE post_type IN ('post', 'page', 'attachment', 'revision') OR post_status = 'trash' OR post_title = 'Brouillon auto' AND ID >= %d)", $start_id);
 				}
 				if (!$wpdb->query($sql_delete_userstats_count)){
 					$this->display_admin_error(sprintf('la requete de nettoyage des stats:%s a eu un probleme', $sql_delete_userstats_count));
@@ -219,7 +215,7 @@ if ( class_exists('fgj2wp', false) ) {
 			public function replace_joo_galleries($wp_post, $joo_post){
 				$new_wp_post = $wp_post; //Array copy
 				$content = $wp_post["post_content"];
-				$pattern_joo_gallery = "/{gallery(.*)?}(.*){\/gallery}/i";
+				$pattern_joo_gallery = "/{gallery([^}]*)?}([a-zA-Z0-9\/]+){\/gallery}/mi"; //m for multiple lines
 				$content = preg_replace_callback($pattern_joo_gallery, array($this, 'replace_one_joo_gallery'), $content);
 				$new_wp_post["post_content"] = $content;
 				return $new_wp_post;
@@ -524,6 +520,30 @@ if ( class_exists('fgj2wp', false) ) {
 					$this->display_admin_error(sprintf('pour le post de id: %d la table %s a pas  pu etre mise a jour', $new_post_id, $wpdb->get_blog_prefix().'userstats_count'));
 				}
 				return 0;
+			}
+			/*It is a filter tor replace the Joomla Shrortcode for Google Maps in the
+			 * WP shortcode for the http://wordpress.org/plugins/wp-flexible-map/ it the post content
+			 * It is called before we import the Category
+			*/
+			public function replace_joo_maps_in_posts($wp_post, $joo_post){
+				$new_wp_post = $wp_post; //Array copy
+				$content = $wp_post["post_content"];
+				$pattern_joo_google_maps = "/{mosmap lat=\'([0-9\.]+)\'|lon=\'([0-9\.]+)\'|(.*)}/i";
+				$content = preg_replace_callback($pattern_joo_google_maps, array($this, 'replace_one_joo_map_in_post'), $content);
+				$new_wp_post["post_content"] = $content;
+				return $new_wp_post;
+			}
+			private function replace_one_joo_map_in_post($found_joo_googlemap_pattern){
+				if(sizeof($found_joo_googlemap_pattern) > 3){
+					$latitude = $found_joo_googlemap_pattern[1];
+					$longitude = $found_joo_googlemap_pattern[2];
+					$translated_map = "[flexiblemap center=\"".$latitude.",".$longitude."\"";
+					$other_attributes_joostr = $found_joo_googlemap_pattern[3];
+					$other_attributes = array();
+					$translated_map .= "]";
+				}else{ //we do nothing we return as is
+					$found_joo_googlemap_pattern[0];
+				}
 			}
 		}
 	}
