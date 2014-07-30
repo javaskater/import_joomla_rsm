@@ -95,8 +95,13 @@ if ( class_exists('fgj2wp', false) ) {
 					//the same kinf of delete statement as for comments
 					$sql_delete_userstats_count = $wpdb->prepare("DELETE FROM ".$wpdb->get_blog_prefix()."userstats_count WHERE post_id IN (SELECT ID FROM ".$wpdb->get_blog_prefix()."posts WHERE post_type IN ('post', 'page', 'attachment', 'revision') OR post_status = 'trash' OR post_title = 'Brouillon auto' AND ID >= %d)", $start_id);
 				}
-				if (!$wpdb->query($sql_delete_userstats_count)){
-					$this->display_admin_error(sprintf('la requete de nettoyage des stats:%s a eu un probleme', $sql_delete_userstats_count));
+				$del_sql = $wpdb->query($sql_delete_userstats_count);
+				if (!$del_sql){
+					if($wpdb->last_error){
+						$this->display_admin_error(sprintf('la requete de nettoyage des stats:%s a eu un probleme: %s', $sql_delete_userstats_count,$wpdb->last_error));
+					}else{
+						$this->display_admin_notice(sprintf('la requete de nettoyage de la table stats:%s a rien fait, la table etait deja vide',$sql_delete_userstats_count));
+					}
 				}
 				return $result;
 			}
