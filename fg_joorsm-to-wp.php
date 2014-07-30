@@ -7,7 +7,7 @@
  * Version:     0.1
  * Author:      Jean-Pierre MENA
  *  */
-
+require_once 'import_docs.php';
 // Exit if accessed directly
 if ( !defined( 'ABSPATH' ) ) exit;
 
@@ -23,6 +23,7 @@ if ( class_exists('fgj2wp', false) ) {
 			private $imported_users = array(); //Users I get From the Joomla database
 			private $media_count = 0; //the total number of images imported !!!
 			private $image_size_in_post;
+			private $docs_manager;
 			public function __construct(){
 				$this->image_size_in_post = "medium"; //I want all the image in posts to be medium size !!!!
 				//ABSPATH contains already a / 
@@ -32,14 +33,17 @@ if ( class_exists('fgj2wp', false) ) {
 				if ( is_array($options) ) {
 					$this->plugin_options = array_merge($this->plugin_options, $options);
 				}
+				$docs_manager = new JooRsm_docs(ABSPATH . 'wp-content/uploads/download-manager-files',$this);
 				//add the users info columns added to the information brought back from the Joomla Post
 				add_filter('fgj2wp_get_posts_add_extra_cols', array(&$this, 'add_info_user_and_stats_to_posts'));
 				//Create WP USers with the same ID as Joo Users and store the generated Password in a usermeta
 				add_action('fgj2wp_pre_import', array(&$this, 'import_joo_users_in_wp'),1);
 				//If I delete all, I delete the imported Joomla users ... action=all only parameter
 				add_action('fgj2wp_post_empty_database', array(&$this, 'delete_joo_users_in_wp'),1,1);
-				//If I delete all, I delete the imported Joomla users ... action=all only parameter
-				add_action('fgj2wp_post_empty_database', array(&$this, 'delete_joo_stats_in_wp'),1,1);
+				//If I delete all, I delete the imported Joomla clics counts ... action=all only parameter
+				add_action('fgj2wp_post_empty_database', array(&$this, 'delete_joo_stats_in_wp'),2,1);
+				//If I delete all, I delete the imported Docs to download ... action=all only parameter
+				add_action('fgj2wp_post_empty_database', array(&$docs_manager, 'suppress_all_ahm_data'),3,1);
 				//I only find the rsm categories the others Post will get 1 as category
 				add_filter('fgj2wp_get_categories', array(&$this, 'only_rsm_categories'));
 				//the next function will be executed first for the tag fgj2wp_pre_insert_post and receives 2 parameters!!!
