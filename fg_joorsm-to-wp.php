@@ -7,9 +7,12 @@
  * Version:     0.1
  * Author:      Jean-Pierre MENA
  *  */
-
+define( 'JOORSM__PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+require_once( JOORSM__PLUGIN_DIR . '/admin/menu.php' );
+RsmImportMenu::init();
 if ( class_exists('fgj2wp', false) ) {
 	class JooRsm extends fgj2wp {
+		private $admin_menu;
 		private $joo_images_directory;
 		private $post_media = array(); //for each post the array of attachment posts of type images
 		private $imported_users = array(); //Users I get From the Joomla database
