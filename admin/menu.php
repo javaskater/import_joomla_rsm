@@ -32,19 +32,25 @@ class RsmImportMenu {
 	 * See page 90 of the CookBook and http://codex.wordpress.org/Function_Reference/add_menu_page
 	 */
 	public static function visualize_imported_users(){
-		global $wpdb;
-		$query = $wpdb->prepare("SELECT u.ID, u.user_login, u.user_email, um.meta_value FROM {$wpdb->users} u, {$wpdb->usermeta} um WHERE u.ID = um.user_id AND um.meta_key='wpgeneratedpass' order by u.ID DESC");
-		$lignes = $wpdb->get_results($query);
-		if ( !(count($lignes) > 0)){
-			echo "<div id=\"warning\" class=\"error fade\"><p>Aucun utilisateur trouvé!</p></div>";
+		//http://codex.wordpress.org/Class_Reference/WP_User_Query
+		$user_query = new WP_User_Query( array ( 'orderby' => 'ID', 'order' => 'DESC' ) );
+		// User Loop
+		if ( ! empty( $user_query->results ) ) {
+			$codeHtml =  "<div><table><thead></thead><tr><th>Id Utilisateur</th><th>Login</th><th>e-mail</th><th>Mot de Passe généré</th><th>Rôle(s)</th></tr><tbody>";
+			foreach ( $user_query->results as $user ) {
+				$user_id = $user->ID;
+				$generated_password = get_user_meta( $user_id, 'wpgeneratedpass', true );
+				$linkToUser = admin_url("user-edit.php?user_id=".$user_id); //http://codex.wordpress.org/Function_Reference/admin_url
+				$codeHtml .= "<tr><td><a href=\"".$linkToUser."\" target=\"_blank\">".$user_id."</a></td><td>".$user->user_login."</td><td>".$user->user_email."</td><td>".$generated_password."</td><td>|";
+				foreach($user->roles as $role){
+					$codeHtml .= $role."|";
+				}
+				$codeHtml .= "</td></tr>";
+			}
+			$codeHtml .= "</tbody></table></id>";
+			echo $codeHtml;
+		} else {
+			echo "<div id=\"warning\" class=\"error fade\"><p>Aucun utilisateur trouvé!</p></div>";;
 		}
-		$codeHtml =  "<div id=\"warning\" class=\"error fade\"><table><thead></thead><tr><th>Id Utilisateur</th><th>Login</th><th>e-mail</th><th>Mot de Passe</th></tr><tbody>";
-		foreach ($lignes as $ligne){
-			//http://codex.wordpress.org/Function_Reference/admin_url
-			$linkToUser = admin_url("user-edit.php?user_id=".$ligne->ID);
-			$codeHtml .= "<tr><td><a href=\"".$linkToUser."\" target=\"_blank\">".$ligne->ID."</a></td><td>".$ligne->user_login."</td><td>".$ligne->user_email."</td><td>".$ligne->meta_value."</td></tr>";
-		}
-		$codeHtml .= "</tbody></table></id>";
-		echo $codeHtml;
 	}
 }
