@@ -227,7 +227,7 @@ if ( class_exists('fgj2wp', false) ) {
 		public function replace_joo_videos($wp_post, $joo_post){
 			$new_wp_post = $wp_post; //Array copy
 			$content = $wp_post["post_content"];
-			$pattern_joo_allvideo = "/{([^}]*)}([a-zA-Z0-9\/]+){\/([^}]*)}/mi"; //m for multiple lines
+			$pattern_joo_allvideo = "/{([^}]*)}([a-zA-Z0-9\/\-\_]+){\/([^}]*)}/mi"; //m for multiple lines
 			$content = preg_replace_callback($pattern_joo_allvideo, array($this, 'replace_one_joo_allvideo'), $content);
 			$new_wp_post["post_content"] = $content;
 			return $new_wp_post;
