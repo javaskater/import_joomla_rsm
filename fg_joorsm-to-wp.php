@@ -18,10 +18,18 @@ if ( class_exists('fgj2wp', false) ) {
 		private $imported_users = array(); //Users I get From the Joomla database
 		private $media_count = 0; //the total number of images imported !!!
 		private $image_size_in_post;
+		private $tab_path_icons;
+		private $ICON_PATH="admin/icons.csv";
 		public function __construct(){
 			$this->image_size_in_post = "medium"; //I want all the image in posts to be medium size !!!!
 			//ABSPATH contains already a / 
 			$this->joo_images_directory = ABSPATH . 'wp-content/uploads/images';
+			$this->tab_path_icons=array();
+			$handle = fopen(JOORSM__PLUGIN_DIR.$this->ICON_PATH, "r");
+			while($buffer = fgets($handle, 4096)){
+				array_push($this->tab_path_icons,trim($buffer));
+			}
+			fclose($handle);
 			$options = get_option('fgj2wp_options');
 			$this->plugin_options = array();
 			if ( is_array($options) ) {
@@ -423,9 +431,10 @@ if ( class_exists('fgj2wp', false) ) {
 		private function restore_links($matches) {
 			$link = $this->post_link[$matches[1]];
 			$new_link = array_key_exists('new_link', $link)? $link['new_link'] : $link['old_link'];
-			$pattern = "/<img(.*?)src=('|\")(.*?).(bmp|gif|jpeg|jpg|png)('|\")(.*?)>/i";
+			$pattern = "/<img(.*?)src=('|\")([a-zA-Z0-9\-\_\:\/\ ]+).(bmp|gif|jpeg|jpg|png)('|\")(.*?)>/i";
 			$image_joolink = $link["old_link"];
-			if(preg_match($pattern,$image_joolink,$joolink_matches)){
+			$image_joolink_decoded=urldecode($image_joolink);
+			if(preg_match($pattern,$image_joolink_decoded,$joolink_matches)){
 				$joo_image_path = $joolink_matches[3].".".$joolink_matches[4];
 				$wp_link = preg_replace("/http:\/\/[^\/]+/", "[url]" , $new_link);//we replace the base ur with the [url] shortcode
 				foreach ( $this->post_media as $old_filename => $media ) {
@@ -450,11 +459,23 @@ if ( class_exists('fgj2wp', false) ) {
 						$wp_link_pattern = "/<img(.*?)class=('|\")(.*?)('|\") src=('|\")(.*?).(bmp|gif|jpeg|jpg|png)('|\")(.*?)>/i";
 						if(preg_match($wp_link_pattern,$wp_link,$wp_link_matches)){
 							$wp_full_img_link = $wp_link_matches[6].".".$wp_link_matches[7];
-							if($thumb_metas["file"] != null && sizeof($thumb_metas["file"]) > 0 && $thumb_metas["file"] !=  $wp_full_img_link){//only if it is not an icon !!! (the Icon are used for links!!!)
-								$new_class = preg_replace ( "/size\-[a-z]+/" , "size-".$this->image_size_in_post,$wp_link_matches[3]);
-								$wp_thumb_img_link = preg_replace ( "/[^\/]+$/" , $meta_values[0]["sizes"]["medium"]["file"] ,$wp_full_img_link);
-								$wp_image = "<img class=\"".$new_class."\" src=\"".$wp_thumb_img_link."\" alt=\"".$attachment->post_excerpt."\" title=\"".$attachment->post_title."\"";
-								$wp_image .= " width=\"".$thumb_metas["width"]."\" height = \"".$thumb_metas["height"]."\" />";
+							$is_icon=false;
+							foreach ($this->tab_path_icons as $icon_path){
+								if(stristr($wp_full_img_link,$icon_path)){
+									$is_icon=true;
+									break;
+								}
+							}
+							$new_class = preg_replace ( "/size\-[a-z]+/" , "size-".$this->image_size_in_post,$wp_link_matches[3]);
+							if($is_icon){
+								$new_class = $new_class." icon";
+							}
+							$wp_thumb_img_link = preg_replace ( "/[^\/]+$/" , $meta_values[0]["sizes"]["medium"]["file"] ,$wp_full_img_link);
+							$wp_image = "<img class=\"".$new_class."\" src=\"".$wp_thumb_img_link."\" alt=\"".$attachment->post_excerpt."\" title=\"".$attachment->post_title."\"";
+							$wp_image .= " width=\"".$thumb_metas["width"]."\" height = \"".$thumb_metas["height"]."\" />";
+							if($is_icon){//only if it is not an icon !!! (the Icon are used for links!!!)
+								$new_link = $wp_image;
+							}else{
 								$new_link = "<a href=\"".$wp_full_img_link."\">".$wp_image."</a>";
 							}
 						}
@@ -529,7 +550,11 @@ if ( class_exists('fgj2wp', false) ) {
 			$the_post_parent = get_post($new_post_id,ARRAY_A);
 			if ( $new_post_id > 0 && $the_post_parent["post_parent"] == 0 && $the_post_parent["post_type"] == 'post' && sizeof($this->post_media) > 0) {
 				// Add links between the post and its medias
-				$this->add_post_media($new_post_id, $the_post_parent, $this->post_media,false);
+				//$this->add_post_media($new_post_id, $the_post_parent, $this->post_media,false);
+				/*
+				 * I decide to habe systematically a Post Thumb image
+				 */
+				$this->add_post_media($new_post_id, $the_post_parent, $this->post_media,true);
 				$this->post_media = array();
 			}
 		}
