@@ -467,17 +467,17 @@ if ( class_exists('fgj2wp', false) ) {
 								}
 							}
 							$new_class = preg_replace ( "/size\-[a-z]+/" , "size-".$this->image_size_in_post,$wp_link_matches[3]);
-							if($is_icon){
-								$new_class = $new_class." icon";
+							if(!$is_icon){
+								$new_class = $new_class." noticon";
 							}
 							$wp_thumb_img_link = preg_replace ( "/[^\/]+$/" , $meta_values[0]["sizes"]["medium"]["file"] ,$wp_full_img_link);
 							$wp_image = "<img class=\"".$new_class."\" src=\"".$wp_thumb_img_link."\" alt=\"".$attachment->post_excerpt."\" title=\"".$attachment->post_title."\"";
 							$wp_image .= " width=\"".$thumb_metas["width"]."\" height = \"".$thumb_metas["height"]."\" />";
-							if($is_icon){//only if it is not an icon !!! (the Icon are used for links!!!)
-								$new_link = $wp_image;
-							}else{
+							if(!$is_icon){//only if it is not an icon !!! (the Icon are used for links!!!)
 								$new_link = "<a href=\"".$wp_full_img_link."\">".$wp_image."</a>";
-							}
+							}else { //if I am an icon $wp_link contains already everything (with the hostname already replaced by the shortcode [url]) !!!!
+								$new_link = $wp_link;
+							} 
 						}
 						break;
 					}
