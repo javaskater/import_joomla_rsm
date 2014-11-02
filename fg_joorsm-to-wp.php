@@ -478,12 +478,11 @@ if ( class_exists('fgj2wp', false) ) {
 								$wp_image .= " width=\"".$thumb_metas["width"]."\" height = \"".$thumb_metas["height"]."\" />";
 								if(!$is_icon){//only if it is not an icon !!! (the Icon are used for links!!!)
 									$new_link = "<a href=\"".$wp_full_img_link."\">".$wp_image."</a>";
-								} //If I am an icon I do nothing I directly return $new Link
+								} else {//If I am an icon I do nothing I directly return $new Link with a small change
+									$new_link = str_replace($this->site_base_url, "[url]", $new_link);
+								}
 							}
 						}else{
-							$is_icon = true;
-						}
-						if ($is_icon){
 							$new_link = str_replace($this->site_base_url, "[url]", $new_link);
 						}
 						break;
