@@ -1,0 +1,69 @@
+--- wp-config.TESTAND.php	2014-10-26 19:13:35.375552152 +0100
++++ wp-config.TESTAND.php	2014-10-26 19:13:35.399552503 +0100
+@@ -19,16 +19,16 @@
+ 
+ // ** Réglages MySQL - Votre hébergeur doit vous fournir ces informations. ** //
+ /** Nom de la base de données de WordPress. */
+-define('DB_NAME', 'votre_nom_de_bdd');
++define('DB_NAME', 'db465905708');
+ 
+ /** Utilisateur de la base de données MySQL. */
+-define('DB_USER', 'votre_utilisateur_de_bdd');
++define('DB_USER', 'dbo465905708');
+ 
+ /** Mot de passe de la base de données MySQL. */
+-define('DB_PASSWORD', 'votre_mdp_de_bdd');
++define('DB_PASSWORD', 'scala39skater');
+ 
+ /** Adresse de l'hébergement MySQL. */
+-define('DB_HOST', 'localhost');
++define('DB_HOST', 'db465905708.db.1and1.com');
+ 
+ /** Jeu de caractères à utiliser par la base de données lors de la création des tables. */
+ define('DB_CHARSET', 'utf8');
+@@ -49,14 +49,14 @@
+  *
+  * @since 2.6.0
+  */
+-define('AUTH_KEY',         'put your unique phrase here'); 
+-define('SECURE_AUTH_KEY',  'put your unique phrase here'); 
+-define('LOGGED_IN_KEY',    'put your unique phrase here'); 
+-define('NONCE_KEY',        'put your unique phrase here'); 
+-define('AUTH_SALT',        'put your unique phrase here'); 
+-define('SECURE_AUTH_SALT', 'put your unique phrase here'); 
+-define('LOGGED_IN_SALT',   'put your unique phrase here'); 
+-define('NONCE_SALT',       'put your unique phrase here'); 
++define('AUTH_KEY',         'T|YBi1qZwy=TQ|z}>>{;+c;GpMQ<2q(iTVFy}yFy8NbdQ(X UcM+:aIPINOYBS M');
++define('SECURE_AUTH_KEY',  'WW/O[*7swe<x&l,YYji0yxkC-:(AdAx||o&4<2LJ6[-tfJ^RG-&9/<5X-##D2B%h');
++define('LOGGED_IN_KEY',    '&e+BIcp(U)85J=-sVq6wj@XjV+(m`>_or>c;${c8E8Mn(H[)|w`,m9L&G|opUt*_');
++define('NONCE_KEY',        'drOtp$e5fQ5G 1rXRE ;J-1gcb RcR|o%zW:YK;;,1BAU|H1]%VSiwzFYH*;SZ?%');
++define('AUTH_SALT',        '7^>-Ot11;%Iq/2Gf5jiH`:~VUCjtRv&A7sSo$e_0VK[|]:[j<{G])}N +E.CytRM');
++define('SECURE_AUTH_SALT', '1Wj9K}02th^1@rv+,ms,zW@aUDGnP<+l+<-V_dpM}|68->1HN ^@!aJ3q> j4_~N');
++define('LOGGED_IN_SALT',   'HK({~j/|-7|f|&h8ka5mvVD2,8=MJNd,?yi2~Ai);te48fJ;AtO+c Z=xkAU)!nv');
++define('NONCE_SALT',       '>->Xq2We%[}$m/Se:)p!&7id#K1g5t;7}7/xuk9l42hIKR(WcgjQB|lO-cg6%xwG');
+ /**#@-*/
+ 
+ /**
+@@ -66,8 +66,21 @@
+  * si vous leur donnez chacune un préfixe unique. 
+  * N'utilisez que des chiffres, des lettres non-accentuées, et des caractères soulignés!
+  */
+-$table_prefix  = 'wp_';
++$table_prefix  = 'rsm_wp_';
+ 
++/**
++ * Langue de localisation de WordPress, par défaut en Anglais.
++ *
++ * Modifiez cette valeur pour localiser WordPress. Un fichier MO correspondant
++ * au langage choisi doit être installé dans le dossier wp-content/languages.
++ * Par exemple, pour mettre en place une traduction française, mettez le fichier
++ * fr_FR.mo dans wp-content/languages, et réglez l'option ci-dessous à "fr_FR".
++ */
++define('WPLANG', 'fr_FR');
++
++/* http://codex.wordpress.org/Changing_The_Site_URL */
++define('WP_HOME','http://test.rsmontreuil.fr');
++define('WP_SITEURL','http://test.rsmontreuil.fr');
+ /** 
+  * Pour les développeurs : le mode deboguage de WordPress.
+  * 
