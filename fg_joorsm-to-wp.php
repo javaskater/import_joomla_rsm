@@ -18,11 +18,13 @@ if ( class_exists('fgj2wp', false) ) {
 		private $imported_users = array(); //Users I get From the Joomla database
 		private $media_count = 0; //the total number of images imported !!!
 		private $image_size_in_post;
+		private $site_base_url;
 		private $tab_path_icons;
 		private $ICON_PATH="admin/icons.csv";
 		public function __construct(){
 			$this->image_size_in_post = "medium"; //I want all the image in posts to be medium size !!!!
 			//ABSPATH contains already a / 
+			$this->site_base_url = get_site_url(); //the url I want to fetch in the images links !!!!
 			$this->joo_images_directory = ABSPATH . 'wp-content/uploads/images';
 			$this->tab_path_icons=array();
 			$handle = fopen(JOORSM__PLUGIN_DIR.$this->ICON_PATH, "r");
@@ -431,10 +433,10 @@ if ( class_exists('fgj2wp', false) ) {
 		private function restore_links($matches) {
 			$link = $this->post_link[$matches[1]];
 			$new_link = array_key_exists('new_link', $link)? $link['new_link'] : $link['old_link'];
-			$pattern = "/<img(.*?)src=('|\")([a-zA-Z0-9\-\_\:\/\ ]+).(bmp|gif|jpeg|jpg|png)('|\")(.*?)>/i";
+			$joo_img_pattern = "/<img(.*?)src=('|\")([a-zA-Z0-9\-\_\:\/\ ]+).(bmp|gif|jpeg|jpg|png)('|\")(.*?)>/i";
 			$image_joolink = $link["old_link"];
 			$image_joolink_decoded=urldecode($image_joolink);
-			if(preg_match($pattern,$image_joolink_decoded,$joolink_matches)){
+			if(preg_match($joo_img_pattern,$image_joolink_decoded,$joolink_matches)){
 				$joo_image_path = $joolink_matches[3].".".$joolink_matches[4];
 				$wp_link = preg_replace("/http:\/\/[^\/]+/", "[url]" , $new_link);//we replace the base ur with the [url] shortcode
 				foreach ( $this->post_media as $old_filename => $media ) {
@@ -455,29 +457,34 @@ if ( class_exists('fgj2wp', false) ) {
 						}
 						//http://codex.wordpress.org/Function_Reference/get_post_meta
 						$meta_values = get_post_meta($attachment->ID, "_wp_attachment_metadata", false );
-						$thumb_metas = $meta_values[0]["sizes"][$this->image_size_in_post];
-						$wp_link_pattern = "/<img(.*?)class=('|\")(.*?)('|\") src=('|\")(.*?).(bmp|gif|jpeg|jpg|png)('|\")(.*?)>/i";
-						if(preg_match($wp_link_pattern,$wp_link,$wp_link_matches)){
-							$wp_full_img_link = $wp_link_matches[6].".".$wp_link_matches[7];
-							$is_icon=false;
-							foreach ($this->tab_path_icons as $icon_path){
-								if(stristr($wp_full_img_link,$icon_path)){
-									$is_icon=true;
-									break;
+						$is_icon=false;
+						if ($meta_values[0]["sizes"][$this->image_size_in_post] != null){
+							$thumb_metas = $meta_values[0]["sizes"][$this->image_size_in_post];
+							$wp_link_pattern = "/<img(.*?)class=('|\")(.*?)('|\") src=('|\")(.*?).(bmp|gif|jpeg|jpg|png)('|\")(.*?)>/i";
+							if(preg_match($wp_link_pattern,$wp_link,$wp_link_matches)){
+								$wp_full_img_link = $wp_link_matches[6].".".$wp_link_matches[7];
+								foreach ($this->tab_path_icons as $icon_path){
+									if(stristr($wp_full_img_link,$icon_path)){
+										$is_icon=true;
+										break;
+									}
 								}
+								$new_class = preg_replace ( "/size\-[a-z]+/" , "size-".$this->image_size_in_post,$wp_link_matches[3]);
+								if(!$is_icon){
+									$new_class = $new_class." noticon";
+								}
+								$wp_thumb_img_link = preg_replace ( "/[^\/]+$/" , $meta_values[0]["sizes"]["medium"]["file"] ,$wp_full_img_link);
+								$wp_image = "<img class=\"".$new_class."\" src=\"".$wp_thumb_img_link."\" alt=\"".$attachment->post_excerpt."\" title=\"".$attachment->post_title."\"";
+								$wp_image .= " width=\"".$thumb_metas["width"]."\" height = \"".$thumb_metas["height"]."\" />";
+								if(!$is_icon){//only if it is not an icon !!! (the Icon are used for links!!!)
+									$new_link = "<a href=\"".$wp_full_img_link."\">".$wp_image."</a>";
+								} //If I am an icon I do nothing I directly return $new Link
 							}
-							$new_class = preg_replace ( "/size\-[a-z]+/" , "size-".$this->image_size_in_post,$wp_link_matches[3]);
-							if(!$is_icon){
-								$new_class = $new_class." noticon";
-							}
-							$wp_thumb_img_link = preg_replace ( "/[^\/]+$/" , $meta_values[0]["sizes"]["medium"]["file"] ,$wp_full_img_link);
-							$wp_image = "<img class=\"".$new_class."\" src=\"".$wp_thumb_img_link."\" alt=\"".$attachment->post_excerpt."\" title=\"".$attachment->post_title."\"";
-							$wp_image .= " width=\"".$thumb_metas["width"]."\" height = \"".$thumb_metas["height"]."\" />";
-							if(!$is_icon){//only if it is not an icon !!! (the Icon are used for links!!!)
-								$new_link = "<a href=\"".$wp_full_img_link."\">".$wp_image."</a>";
-							}else { //if I am an icon $wp_link contains already everything (with the hostname already replaced by the shortcode [url]) !!!!
-								$new_link = $wp_link;
-							} 
+						}else{
+							$is_icon = true;
+						}
+						if ($is_icon){
+							$new_link = str_replace($this->site_base_url, "[url]", $new_link);
 						}
 						break;
 					}
