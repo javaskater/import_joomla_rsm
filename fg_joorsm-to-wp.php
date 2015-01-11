@@ -222,7 +222,7 @@ if ( class_exists('fgj2wp', false) ) {
 		public function replace_joo_galleries($wp_post, $joo_post){
 			$new_wp_post = $wp_post; //Array copy
 			$content = $wp_post["post_content"];
-			$pattern_joo_gallery = "/{gallery([^}]*)?}([a-zA-Z0-9\/]+){\/gallery}/mi"; //m for multiple lines
+			$pattern_joo_gallery = "/{gallery([^}]*)?}([a-zA-Z0-9\/\-]+){\/gallery}/mi"; //m for multiple lines
 			$content = preg_replace_callback($pattern_joo_gallery, array($this, 'replace_one_joo_gallery'), $content);
 			$new_wp_post["post_content"] = $content;
 			return $new_wp_post;
@@ -261,6 +261,8 @@ if ( class_exists('fgj2wp', false) ) {
 						return "[embed width=\"600px\"]http://www.youtube.com/watch?v=".$videoId."[/embed]";
 					}elseif ($video_type == "dailymotion"){
 						return "[embed width=\"600px\"]http://www.dailymotion.com/video/".$videoId."[/embed]";
+					}elseif ($video_type == "vimeo"){
+						return "[embed width=\"600px\"]http://vimeo.com/".$videoId."[/embed]";
 					}else{
 						$this->display_admin_error(sprintf('trouve une video de type %s et de Id: %s non pris en charge', $video_type, $found_joo_allvideo_pattern[2]));
 						return $found_joo_allvideo_pattern[0];
