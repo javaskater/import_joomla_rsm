@@ -5,7 +5,7 @@ function install_from_wp_website {
 		cible=$2
 		archive_a_recuperer=$(basename $url)
 		if [[ ! -f "$DOWNLOAD/$archive_a_recuperer" ]]; then
-			CURL_PROXY_OPTION="--proxy dgproxy.appli.dgi:8080"
+			#CURL_PROXY_OPTION="--proxy dgproxy.appli.dgi:8080"
 			curl_exe=$(which curl)
 			$curl_exe $CURL_PROXY_OPTION $url -o "$DOWNLOAD/$archive_a_recuperer"
 		fi
@@ -42,7 +42,7 @@ function install_from_gitHub {
 	nom_plugin=$(basename ${url%%/zip/master})
 	archive_a_recuperer="${nom_plugin}.zip"
 	if [[ ! -f "$DOWNLOAD/$archive_a_recuperer" ]]; then
-		CURL_PROXY_OPTION="--proxy dgproxy.appli.dgi:8080"
+		#CURL_PROXY_OPTION="--proxy dgproxy.appli.dgi:8080"
 		curl_exe=$(which curl)
 		$curl_exe $CURL_PROXY_OPTION $url -o "$DOWNLOAD/$archive_a_recuperer"
 	fi
@@ -54,7 +54,7 @@ function install_from_gitHub {
 
 function main {
 	export DOWNLOAD="/home/jpmena/workspace/RSM/test/tmp"
-	export WP_HOME="/home/jpmena/workspace/RSM/test/deploy"
+	export WP_HOME="/home/jpmena/workspace/RSM"
 	export WP_URL="https://fr.wordpress.org/wordpress-4.0-fr_FR.tar.gz"
 	export THEMES_LIST_CSV="listeThemes.csv"
 	export THEMES_GITHUBLIST_CSV="listeGitThemes.csv"
