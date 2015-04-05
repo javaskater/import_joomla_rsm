@@ -55,7 +55,7 @@ function install_from_gitHub {
 function main {
 	export DOWNLOAD="/home/jpmena/workspace/RSM/test/tmp"
 	export WP_HOME="/home/jpmena/workspace/RSM"
-	export WP_URL="https://fr.wordpress.org/wordpress-4.0-fr_FR.tar.gz"
+	export WP_URL="https://fr.wordpress.org/wordpress-4.1.1-fr_FR.zip"
 	export THEMES_LIST_CSV="listeThemes.csv"
 	export THEMES_GITHUBLIST_CSV="listeGitThemes.csv"
 	export PLUGINS_LIST_CSV="listePlugins.csv"
