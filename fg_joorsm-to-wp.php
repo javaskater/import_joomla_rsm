@@ -12,6 +12,8 @@ require_once( JOORSM__PLUGIN_DIR . '/admin/menu.php' );
 RsmImportMenu::init();
 if ( class_exists('fgj2wp', false) ) {
 	class JooRsm extends fgj2wp {
+		const REGEXPQUOTES = '["\\\\]+'; //on ne met pas \' car un contenu title ou alt peut l'inclure !!!!
+		const NOT_REGEXPQUOTES = '[^"\\\\]+'; //http://stackoverflow.com/questions/22070140/preg-match-a-php-string-with-simple-or-double-quotes-escaped-inside
 		private $admin_menu;
 		private $joo_images_directory;
 		private $post_media = array(); //for each post the array of attachment posts of type images
@@ -277,8 +279,8 @@ if ( class_exists('fgj2wp', false) ) {
 		private function import_existing_media($content, $post_date) {
 			$media = array();
 			$media_count = 0;
-				
-			if ( preg_match_all('#<(img|a)(.*?)(src|href)="(.*?)"(.*?)>#', $content, $matches, PREG_SET_ORDER) > 0 ) {
+			$pattern = '#<(img|a)(.*?)(src|href)='.self::REGEXPQUOTES.'('.self::NOT_REGEXPQUOTES.')'.self::REGEXPQUOTES.'(.*?)>#';
+			if ( preg_match_all($pattern, $content, $matches, PREG_SET_ORDER) > 0 ) {
 				if ( is_array($matches) ) {
 					foreach ($matches as $match ) {
 						$filename = $match[4];
@@ -387,6 +389,172 @@ if ( class_exists('fgj2wp', false) ) {
 					'media_count'	=> $media_count
 			);
 		}
+		/**
+		 * Process the post content
+		 * a dû être recopiée ici  car appelle une fonction privée que je suis obligé de redéfinir ci dessous
+		 * @param string $content Post content
+		 * @param array $post_media Post medias
+		 * @return string Processed post content
+		 */
+		public function process_content($content, $post_media) {
+				
+			if ( !empty($content) ) {
+				$content = str_replace(array("\r", "\n"), array('', ' '), $content);
+		
+				// Replace page breaks
+				$content = preg_replace("#<hr([^>]*?)class=\"system-pagebreak\"(.*?)/>#", "<!--nextpage-->", $content);
+		
+				// Replace media URLs with the new URLs
+				$content = $this->process_content_media_links_redfini_rsm($content, $post_media);
+		
+				// For importing backslashes
+				$content = addslashes($content);
+			}
+		
+			return $content;
+		}
+		/**
+		 * Check if the attachment exists in the database
+		 * obligé de la copier icci ccar elle est définie comme privée dans la classe mère !!!
+		 * @param string $name
+		 * @return object Post
+		 */
+		protected function get_attachment_from_name($name) {
+			$name = preg_replace('/\.[^.]+$/', '', basename($name));
+			$r = array(
+					'name'			=> $name,
+					'post_type'		=> 'attachment',
+					'numberposts'	=> 1,
+			);
+			$posts_array = get_posts($r);
+			if ( is_array($posts_array) && (count($posts_array) > 0) ) {
+				return $posts_array[0];
+			}
+			else {
+				return false;
+			}
+		}
+		/**
+		 * Replace media URLs with the new URLs
+		 * Je suis obligé de recopier cette fonction ici car l'auteur n'a pas pris en compte le contenu échappé !!!
+		 * 
+		 * @param string $content
+		 *        	Post content
+		 * @param array $post_media
+		 *        	Post medias
+		 * @return string Processed post content
+		 */
+		protected function process_content_media_links_redfini_rsm($content, $post_media) {
+			$matches = array ();
+			$matches_caption = array ();
+			
+			if (is_array ( $post_media )) {
+				
+				// Get the attachments attributes
+				$attachments_found = false;
+				foreach ( $post_media as $old_filename => &$media_var ) {
+					$post_media_name = $media_var ['name'];
+					$attachment = $this->get_attachment_from_name ( $post_media_name ); //TODO fonction à redéfinir ici aussi car privée ailleurs !!!!
+					if ($attachment) {
+						$media_var ['attachment_id'] = $attachment->ID;
+						$media_var ['old_filename_without_spaces'] = str_replace ( " ", "%20", $old_filename ); // for filenames with spaces
+						if (preg_match ( '/image/', $attachment->post_mime_type )) {
+							// Image
+							$image_src = wp_get_attachment_image_src ( $attachment->ID, 'full' );
+							$media_var ['new_url'] = $image_src [0];
+							$media_var ['width'] = $image_src [1];
+							$media_var ['height'] = $image_src [2];
+						} else {
+							// Other media
+							$media_var ['new_url'] = wp_get_attachment_url ( $attachment->ID );
+						}
+						$attachments_found = true;
+					}
+				}
+				if ($attachments_found) {
+					
+					// Remove the links from the content
+					$this->post_link_count = 0;
+					$this->post_link = array ();
+					$content = preg_replace_callback ( '#<(a) (.*?)(href)=(.*?)</a>#i', array (
+							$this,
+							'remove_links' 
+					), $content );
+					$content = preg_replace_callback ( '#<(img) (.*?)(src)=(.*?)>#i', array (
+							$this,
+							'remove_links' 
+					), $content );
+					
+					// Process the stored medias links
+					$first_image_removed = false;
+					foreach ( $this->post_link as &$link ) {
+						
+						// Remove the first image from the content
+						if (($this->plugin_options ['first_image'] == 'as_featured') && ! $first_image_removed && preg_match ( '#^<img#', $link ['old_link'] )) {
+							$link ['new_link'] = '';
+							$first_image_removed = true;
+							continue;
+						}
+						$new_link = $link ['old_link'];
+						$alignment = '';
+						if (preg_match ( '/(align=' . self::REGEXPQUOTES . '|float: )(left|right)/', $new_link, $matches )) {
+							$alignment = 'align' . $matches [2];
+						}
+						if (preg_match_all ( '#(src|href)=' . self::REGEXPQUOTES . '(.*?)' . self::REGEXPQUOTES . '#i', $new_link, $matches, PREG_SET_ORDER )) {
+							$caption = '';
+							foreach ( $matches as $match ) {
+								$old_filename = str_replace ( '%20', ' ', $match [2] ); // For filenames with %20
+								$link_type = ($match [1] == 'src') ? 'img' : 'a';
+								if (array_key_exists ( $old_filename, $post_media )) {
+									$media = $post_media [$old_filename];
+									if (array_key_exists ( 'new_url', $media )) {
+										if ((strpos ( $new_link, $old_filename ) > 0) || (strpos ( $new_link, $media ['old_filename_without_spaces'] ) > 0)) {
+											$new_link = preg_replace ( '#(' . $old_filename . '|' . $media ['old_filename_without_spaces'] . ')#', $media ['new_url'], $new_link, 1 );
+											
+											if ($link_type == 'img') { // images only
+											                             // Define the width and the height of the image if it isn't defined yet
+												if ((strpos ( $new_link, 'width=' ) === false) && (strpos ( $new_link, 'height=' ) === false)) {
+													$width_assertion = isset ( $media ['width'] ) ? ' width="' . $media ['width'] . '"' : '';
+													$height_assertion = isset ( $media ['height'] ) ? ' height="' . $media ['height'] . '"' : '';
+												} else {
+													$width_assertion = '';
+													$height_assertion = '';
+												}
+												
+												// Caption shortcode
+												if (preg_match ( '/class=' . self::REGEXPQUOTES . '.*caption.*?' . self::REGEXPQUOTES . '/', $link ['old_link'] )) {
+													if (preg_match ( '/title="(.*?)"/', $link ['old_link'], $matches_caption )) {
+														$caption_value = str_replace ( '%', '%%', $matches_caption [1] );
+														$align_value = ($alignment != '') ? $alignment : 'alignnone';
+														$caption = '[caption id="attachment_' . $media ['attachment_id'] . '" align="' . $align_value . '"' . $width_assertion . ']%s' . $caption_value . '[/caption]';
+													}
+												}
+												
+												$align_class = ($alignment != '') ? $alignment . ' ' : '';
+												$new_link = preg_replace ( '#<img(.*?)( class=' . self::REGEXPQUOTES . '(.*?)' . self::REGEXPQUOTES . ')?(.*) />#', "<img$1 class=\"$3 " . $align_class . 'size-full wp-image-' . $media ['attachment_id'] . "\"$4" . $width_assertion . $height_assertion . ' />', $new_link );
+											}
+										}
+									}
+								}
+							}
+							
+							// Add the caption
+							if ($caption != '') {
+								$new_link = sprintf ( $caption, $new_link );
+							}
+						}
+						$link ['new_link'] = $new_link;
+					}
+					
+					// Reinsert the converted medias links
+					$content = preg_replace_callback ( '#__fg_link_(\d+)__#', array (
+							$this,
+							'restore_links' 
+					), $content );
+				}
+			}
+			return $content;
+		}
 		
 		/**
 		 * Remove all the links from the content and replace them with a specific tag
@@ -396,7 +564,7 @@ if ( class_exists('fgj2wp', false) ) {
 		 */
 		private function remove_links($matches) {
 			$joo_link_or_image = $matches[0];
-			$joo_link_pattern = "/<img(.*)src=\"([^\"]*)\"(.*)(alt=\"([^\"]*)\")(.*)(title=\"([^\"]*)\")(.*)\/>/i";
+			$joo_link_pattern = "/<img(.*)src=".self::REGEXPQUOTES."(".self::NOT_REGEXPQUOTES.")".self::REGEXPQUOTES."(.*)(alt=".self::REGEXPQUOTES."(".self::NOT_REGEXPQUOTES.")".self::REGEXPQUOTES.")(.*)(title=".self::REGEXPQUOTES."(".self::NOT_REGEXPQUOTES.")".self::REGEXPQUOTES.")(.*)\/>/i";
 			if(preg_match($joo_link_pattern,$matches[0],$joolink_matches)){
 				$nb_joolinks_matches = sizeof($joolink_matches);
 				if ($nb_joolinks_matches > 8){ //we have a title and an alt
@@ -410,7 +578,7 @@ if ( class_exists('fgj2wp', false) ) {
 					$this->post_link[] = array('old_link' => $joo_link_or_image);
 				}
 			}else{ //We have title alone
-				$joo_link_pattern = "/<img(.*)src=\"([^\"]*)\"(.*)(title=\"([^\"]*)\")(.*)\/>/i";
+				$joo_link_pattern = "/<img(.*)src=".self::REGEXPQUOTES."(".self::NOT_REGEXPQUOTES.")".self::REGEXPQUOTES."(.*)(title=".self::REGEXPQUOTES."(".self::NOT_REGEXPQUOTES.")".self::REGEXPQUOTES.")(.*)\/>/i";
 				if(preg_match($joo_link_pattern,$matches[0],$joolink_matches)){
 					$nb_joolinks_matches = sizeof($joolink_matches);
 					if ($nb_joolinks_matches > 5){ //we have a title and an alt
@@ -435,7 +603,7 @@ if ( class_exists('fgj2wp', false) ) {
 		private function restore_links($matches) {
 			$link = $this->post_link[$matches[1]];
 			$new_link = array_key_exists('new_link', $link)? $link['new_link'] : $link['old_link'];
-			$joo_img_pattern = "/<img(.*?)src=('|\")([a-zA-Z0-9\-\_\:\/\ ]+).(bmp|gif|jpeg|jpg|png)('|\")(.*?)>/i";
+			$joo_img_pattern = "/<img(.*?)src=(".self::REGEXPQUOTES.")([a-zA-Z0-9\-\_\:\/\ ]+).(bmp|gif|jpeg|jpg|png)(".self::REGEXPQUOTES.")(.*?)>/i";
 			$image_joolink = $link["old_link"];
 			$image_joolink_decoded=urldecode($image_joolink);
 			if(preg_match($joo_img_pattern,$image_joolink_decoded,$joolink_matches)){
@@ -462,7 +630,7 @@ if ( class_exists('fgj2wp', false) ) {
 						$is_icon=false;
 						if ($meta_values[0]["sizes"][$this->image_size_in_post] != null){
 							$thumb_metas = $meta_values[0]["sizes"][$this->image_size_in_post];
-							$wp_link_pattern = "/<img(.*?)class=('|\")(.*?)('|\") src=('|\")(.*?).(bmp|gif|jpeg|jpg|png)('|\")(.*?)>/i";
+							$wp_link_pattern = "/<img(.*?)class=(".self::REGEXPQUOTES.")(".self::NOT_REGEXPQUOTES.")(".self::REGEXPQUOTES.") src=(".self::REGEXPQUOTES.")(".self::NOT_REGEXPQUOTES.").(bmp|gif|jpeg|jpg|png)(".self::REGEXPQUOTES.")(.*?)>/i";
 							if(preg_match($wp_link_pattern,$wp_link,$wp_link_matches)){
 								$wp_full_img_link = $wp_link_matches[6].".".$wp_link_matches[7];
 								foreach ($this->tab_path_icons as $icon_path){
@@ -593,7 +761,7 @@ if ( class_exists('fgj2wp', false) ) {
 		public function replace_joo_maps_in_posts($wp_post, $joo_post){
 			$new_wp_post = $wp_post; //Array copy
 			$content = $wp_post["post_content"];
-			$pattern_joo_google_maps = "/{mosmap lat=\'([0-9\.]+)\'\|lon=\'([0-9\.]+)\'\|([^}]*)}/i";
+			$pattern_joo_google_maps = "/{mosmap lat=".self::REGEXPQUOTES."([0-9\.]+)".self::REGEXPQUOTES."\|lon=".self::REGEXPQUOTES."([0-9\.]+)".self::REGEXPQUOTES."\|([^}]*)}/i";
 			$content = preg_replace_callback($pattern_joo_google_maps, array($this, 'replace_one_joo_map_in_post'), $content);
 			$new_wp_post["post_content"] = $content;
 			return $new_wp_post;
@@ -605,20 +773,20 @@ if ( class_exists('fgj2wp', false) ) {
 				$translated_map = "[flexiblemap center=\"".$latitude.",".$longitude."\"";
 				$other_attributes_joostr = $found_joo_googlemap_pattern[3];
 				$other_attributes = array("width"=>"100%", "height"=>"400px","zoom"=>9,"title"=>"Rendez-vous", "description"=>"---", "link"=>null);
-				$pattern = "/lbxwidth=\'([0-9]+px)\'/";
+				$pattern = "/lbxwidth=".self::REGEXPQUOTES."([0-9]+px)".self::REGEXPQUOTES."/";
 				$matches = array();
 				if (preg_match($pattern, $other_attributes_joostr, $matches, PREG_OFFSET_CAPTURE)){
 					$other_attributes["width"] = $matches[1][0];
 				}
-				$pattern = "/lbxheight=\'([0-9]+px)\'/";
+				$pattern = "/lbxheight=".self::REGEXPQUOTES."([0-9]+px)".self::REGEXPQUOTES."/";
 				if (preg_match($pattern, $other_attributes_joostr, $matches, PREG_OFFSET_CAPTURE)){
 					$other_attributes["height"] = $matches[1][0];
 				}
-				$pattern = "/zoom=\'([0-9]+)\'/";
+				$pattern = "/zoom=".self::REGEXPQUOTES."([0-9]+)".self::REGEXPQUOTES."/";
 				if (preg_match($pattern, $other_attributes_joostr, $matches, PREG_OFFSET_CAPTURE)){
 					$other_attributes["zoom"] = $matches[1][0];
 				}
-				$pattern = "/text=\'([^\']+)\'/";
+				$pattern = "/text=".self::REGEXPQUOTES."(".self::NOT_REGEXPQUOTES.")".self::REGEXPQUOTES."/";
 				if (preg_match($pattern, $other_attributes_joostr, $matches, PREG_OFFSET_CAPTURE)){
 					$this->translate_description_from_joo_to_wp($matches[1][0],$other_attributes);
 				}
@@ -632,7 +800,7 @@ if ( class_exists('fgj2wp', false) ) {
 			}
 		}
 		protected function translate_description_from_joo_to_wp($joo_description, &$attributes_for_wordpress){
-			$pattern_link_more_info = "/<a href=\"([^\"]+)\"[^>]+>[^<]+<\/a>/mi";
+			$pattern_link_more_info = "/<a href=".self::REGEXPQUOTES."(".self::NOT_REGEXPQUOTES.")".self::REGEXPQUOTES."[^>]+>[^<]+<\/a>/mi";
 			$description_without_tags = null;
 			//http://php.net/manual/en/function.preg-replace.php see examples at the end
 			$description_without_link = preg_replace ( $pattern_link_more_info , "" , $joo_description);
