@@ -14,6 +14,8 @@ if ( class_exists('fgj2wp', false) ) {
 	class JooRsm extends fgj2wp {
 		const REGEXPQUOTES = '["\\\\]+'; //on ne met pas \' car un contenu title ou alt peut l'inclure !!!!
 		const NOT_REGEXPQUOTES = '[^"\\\\]+'; //http://stackoverflow.com/questions/22070140/preg-match-a-php-string-with-simple-or-double-quotes-escaped-inside
+		const REGEXPSIMPLEQUOTES = '[\'\\\\]+';
+		const NOT_REGEXPSIMPLEQUOTES = '[^\'\\\\]+';
 		private $admin_menu;
 		private $joo_images_directory;
 		private $post_media = array(); //for each post the array of attachment posts of type images
@@ -60,6 +62,8 @@ if ( class_exists('fgj2wp', false) ) {
 			add_filter('fgj2wp_pre_insert_post', array(&$this, 'replace_joo_videos'),4,2);
 			//this function will be called after to replace the Joo Google Maps Short code  with the WP shortcode ...
 			add_filter('fgj2wp_pre_insert_post', array(&$this, 'replace_joo_maps_in_posts'),5,2);
+			//this function will be called after to unescape the simple and double quotes !!!!
+			add_filter('fgj2wp_pre_insert_post', array(&$this, 'unescape_wp_post_content_before_insertion'),6,2);
 			//after the post has been inserted we take care of linking the attachments to the parent post !!!
 			add_action('fgj2wp_post_insert_post', array(&$this, 'link_attachment_to_parent_post'),1,2);
 			//after the post has been inserted we take care getting the users stats from Joomla !!!
@@ -627,31 +631,33 @@ if ( class_exists('fgj2wp', false) ) {
 						}
 						//http://codex.wordpress.org/Function_Reference/get_post_meta
 						$meta_values = get_post_meta($attachment->ID, "_wp_attachment_metadata", false );
+						$wp_link_pattern = '/<img(.*?)class=('.self::REGEXPQUOTES.')('.self::NOT_REGEXPQUOTES.')('.self::REGEXPQUOTES.') src=('.self::REGEXPQUOTES.')('.self::NOT_REGEXPQUOTES.').(bmp|gif|jpeg|jpg|png)('.self::REGEXPQUOTES.')(.*?)>/i';
 						$is_icon=false;
-						if ($meta_values[0]["sizes"][$this->image_size_in_post] != null){
-							$thumb_metas = $meta_values[0]["sizes"][$this->image_size_in_post];
-							$wp_link_pattern = "/<img(.*?)class=(".self::REGEXPQUOTES.")(".self::NOT_REGEXPQUOTES.")(".self::REGEXPQUOTES.") src=(".self::REGEXPQUOTES.")(".self::NOT_REGEXPQUOTES.").(bmp|gif|jpeg|jpg|png)(".self::REGEXPQUOTES.")(.*?)>/i";
-							if(preg_match($wp_link_pattern,$wp_link,$wp_link_matches)){
-								$wp_full_img_link = $wp_link_matches[6].".".$wp_link_matches[7];
-								foreach ($this->tab_path_icons as $icon_path){
-									if(stristr($wp_full_img_link,$icon_path)){
-										$is_icon=true;
-										break;
-									}
-								}
-								$new_class = preg_replace ( "/size\-[a-z]+/" , "size-".$this->image_size_in_post,$wp_link_matches[3]);
-								if(!$is_icon){
-									$new_class = $new_class." noticon";
-								}
-								$wp_thumb_img_link = preg_replace ( "/[^\/]+$/" , $meta_values[0]["sizes"]["medium"]["file"] ,$wp_full_img_link);
-								$wp_image = "<img class=\"".$new_class."\" src=\"".$wp_thumb_img_link."\" alt=\"".$attachment->post_excerpt."\" title=\"".$attachment->post_title."\"";
-								$wp_image .= " width=\"".$thumb_metas["width"]."\" height = \"".$thumb_metas["height"]."\" />";
-								if(!$is_icon){//only if it is not an icon !!! (the Icon are used for links!!!)
-									$new_link = "<a href=\"".$wp_full_img_link."\">".$wp_image."</a>";
-								} else {//If I am an icon I do nothing I directly return $new Link with a small change
-									$new_link = str_replace($this->site_base_url, "[url]", $new_link);
+						if(preg_match($wp_link_pattern,$wp_link,$wp_link_matches)){
+							$wp_full_img_link = $wp_link_matches[6].".".$wp_link_matches[7];
+							foreach ($this->tab_path_icons as $icon_path){
+								if(stristr($wp_full_img_link,$icon_path)){
+									$is_icon=true;
+									break;
 								}
 							}
+						}
+						if ($meta_values[0]["sizes"][$this->image_size_in_post] != null){
+							$thumb_metas = $meta_values[0]["sizes"][$this->image_size_in_post];
+							$new_class = preg_replace ( "/size\-[a-z]+/" , "size-".$this->image_size_in_post,$wp_link_matches[3]);
+							if(!$is_icon){
+								$new_class = $new_class." noticon";
+							}
+							$wp_thumb_img_link = preg_replace ( "/[^\/]+$/" , $meta_values[0]["sizes"]["medium"]["file"] ,$wp_full_img_link);
+							$wp_image = "<img class=\"".$new_class."\" src=\"".$wp_thumb_img_link."\" alt=\"".$attachment->post_excerpt."\" title=\"".$attachment->post_title."\"";
+							$wp_image .= " width=\"".$thumb_metas["width"]."\" height = \"".$thumb_metas["height"]."\" />";
+							if(!$is_icon){//only if it is not an icon !!! (the Icon are used for links!!!)
+								$new_link = "<a href=\"".$wp_full_img_link."\">".$wp_image."</a>";
+							} else {//If I am an icon I do nothing I directly return $new Link with a small change
+								$new_link = str_replace($this->site_base_url, "[url]", $new_link);
+							}
+						}else if ($is_icon){
+							$new_link = str_replace(self::REGEXPQUOTES, '"', $wp_link);;
 						}else{
 							$new_link = str_replace($this->site_base_url, "[url]", $new_link);
 						}
@@ -761,7 +767,7 @@ if ( class_exists('fgj2wp', false) ) {
 		public function replace_joo_maps_in_posts($wp_post, $joo_post){
 			$new_wp_post = $wp_post; //Array copy
 			$content = $wp_post["post_content"];
-			$pattern_joo_google_maps = "/{mosmap lat=".self::REGEXPQUOTES."([0-9\.]+)".self::REGEXPQUOTES."\|lon=".self::REGEXPQUOTES."([0-9\.]+)".self::REGEXPQUOTES."\|([^}]*)}/i";
+			$pattern_joo_google_maps = '/{mosmap lat='.self::REGEXPSIMPLEQUOTES.'([0-9\.]+)'.self::REGEXPSIMPLEQUOTES.'\|lon='.self::REGEXPSIMPLEQUOTES.'([0-9\.]+)'.self::REGEXPSIMPLEQUOTES.'\|([^}]*)}/i';
 			$content = preg_replace_callback($pattern_joo_google_maps, array($this, 'replace_one_joo_map_in_post'), $content);
 			$new_wp_post["post_content"] = $content;
 			return $new_wp_post;
@@ -773,20 +779,20 @@ if ( class_exists('fgj2wp', false) ) {
 				$translated_map = "[flexiblemap center=\"".$latitude.",".$longitude."\"";
 				$other_attributes_joostr = $found_joo_googlemap_pattern[3];
 				$other_attributes = array("width"=>"100%", "height"=>"400px","zoom"=>9,"title"=>"Rendez-vous", "description"=>"---", "link"=>null);
-				$pattern = "/lbxwidth=".self::REGEXPQUOTES."([0-9]+px)".self::REGEXPQUOTES."/";
+				$pattern = '/lbxwidth='.self::REGEXPSIMPLEQUOTES.'([0-9]+px)'.self::REGEXPSIMPLEQUOTES.'/';
 				$matches = array();
 				if (preg_match($pattern, $other_attributes_joostr, $matches, PREG_OFFSET_CAPTURE)){
 					$other_attributes["width"] = $matches[1][0];
 				}
-				$pattern = "/lbxheight=".self::REGEXPQUOTES."([0-9]+px)".self::REGEXPQUOTES."/";
+				$pattern = '/lbxheight='.self::REGEXPSIMPLEQUOTES.'([0-9]+px)'.self::REGEXPSIMPLEQUOTES.'/';
 				if (preg_match($pattern, $other_attributes_joostr, $matches, PREG_OFFSET_CAPTURE)){
 					$other_attributes["height"] = $matches[1][0];
 				}
-				$pattern = "/zoom=".self::REGEXPQUOTES."([0-9]+)".self::REGEXPQUOTES."/";
+				$pattern = '/zoom='.self::REGEXPSIMPLEQUOTES.'([0-9]+)'.self::REGEXPSIMPLEQUOTES.'/';
 				if (preg_match($pattern, $other_attributes_joostr, $matches, PREG_OFFSET_CAPTURE)){
 					$other_attributes["zoom"] = $matches[1][0];
 				}
-				$pattern = "/text=".self::REGEXPQUOTES."(".self::NOT_REGEXPQUOTES.")".self::REGEXPQUOTES."/";
+				$pattern = '/text='.self::REGEXPSIMPLEQUOTES.'('.self::NOT_REGEXPSIMPLEQUOTES.')'.self::REGEXPSIMPLEQUOTES.'/';
 				if (preg_match($pattern, $other_attributes_joostr, $matches, PREG_OFFSET_CAPTURE)){
 					$this->translate_description_from_joo_to_wp($matches[1][0],$other_attributes);
 				}
@@ -800,7 +806,7 @@ if ( class_exists('fgj2wp', false) ) {
 			}
 		}
 		protected function translate_description_from_joo_to_wp($joo_description, &$attributes_for_wordpress){
-			$pattern_link_more_info = "/<a href=".self::REGEXPQUOTES."(".self::NOT_REGEXPQUOTES.")".self::REGEXPQUOTES."[^>]+>[^<]+<\/a>/mi";
+			$pattern_link_more_info = '/<a href='.self::REGEXPQUOTES.'('.self::NOT_REGEXPQUOTES.')'.self::REGEXPQUOTES.'[^>]+>[^<]+<\/a>/mi';
 			$description_without_tags = null;
 			//http://php.net/manual/en/function.preg-replace.php see examples at the end
 			$description_without_link = preg_replace ( $pattern_link_more_info , "" , $joo_description);
@@ -817,6 +823,19 @@ if ( class_exists('fgj2wp', false) ) {
 			if (preg_match($pattern_link_more_info, $joo_description, $found_links, PREG_OFFSET_CAPTURE) && count($found_links) > 1){
 				$attributes_for_wordpress["link"] = $found_links[1][0];
 			}
+		}
+		
+		/*It is a filter tor unescape all the quotes and double quotes
+		 * last thing to do before real insertion !!!!
+		 */
+		public function unescape_wp_post_content_before_insertion($wp_post, $joo_post){
+			$new_wp_post = $wp_post; //Array copy
+			$content = $wp_post["post_content"];
+			$array_escaped_quotes = array('/'.self::REGEXPQUOTES.'/', '/'.self::REGEXPSIMPLEQUOTES.'/');
+			$array_unescaped_quotes = array("\"", "'");
+			$unescaped_content = preg_replace($array_escaped_quotes, $array_unescaped_quotes, $content);
+			$new_wp_post["post_content"] = $unescaped_content;
+			return $new_wp_post;
 		}
 	}
 	
