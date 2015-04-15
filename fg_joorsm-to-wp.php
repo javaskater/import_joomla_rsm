@@ -16,6 +16,7 @@ if ( class_exists('fgj2wp', false) ) {
 		const NOT_REGEXPQUOTES = '[^"\\\\]+'; //http://stackoverflow.com/questions/22070140/preg-match-a-php-string-with-simple-or-double-quotes-escaped-inside
 		const REGEXPSIMPLEQUOTES = '[\'\\\\]+';
 		const NOT_REGEXPSIMPLEQUOTES = '[^\'\\\\]+';
+		const REGEXPBACKSLASHES = '[\\\\]+';
 		private $admin_menu;
 		private $joo_images_directory;
 		private $post_media = array(); //for each post the array of attachment posts of type images
@@ -831,8 +832,8 @@ if ( class_exists('fgj2wp', false) ) {
 		public function unescape_wp_post_content_before_insertion($wp_post, $joo_post){
 			$new_wp_post = $wp_post; //Array copy
 			$content = $wp_post["post_content"];
-			$array_escaped_quotes = array('/'.self::REGEXPQUOTES.'/', '/'.self::REGEXPSIMPLEQUOTES.'/');
-			$array_unescaped_quotes = array("\"", "'");
+			$array_escaped_quotes = array('/('.self::REGEXPBACKSLASHES.')/');
+			$array_unescaped_quotes = array("");
 			$unescaped_content = preg_replace($array_escaped_quotes, $array_unescaped_quotes, $content);
 			$new_wp_post["post_content"] = $unescaped_content;
 			return $new_wp_post;
