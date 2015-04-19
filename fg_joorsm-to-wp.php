@@ -37,6 +37,7 @@ if ( class_exists('fgj2wp', false) ) {
 				array_push($this->tab_path_icons,trim($buffer));
 			}
 			fclose($handle);
+			$docs_manager = new JooRsm_docs(ABSPATH . 'wp-content/uploads/download-manager-files',$this);
 			$options = get_option('fgj2wp_options');
 			$this->plugin_options = array();
 			if ( is_array($options) ) {
@@ -49,7 +50,9 @@ if ( class_exists('fgj2wp', false) ) {
 			//If I delete all, I delete the imported Joomla users ... action=all only parameter
 			add_action('fgj2wp_post_empty_database', array(&$this, 'delete_joo_users_in_wp'),1,1);
 			//If I delete all, I delete the imported Joomla users ... action=all only parameter
-			add_action('fgj2wp_post_empty_database', array(&$this, 'delete_joo_stats_in_wp'),1,1);
+			add_action('fgj2wp_post_empty_database', array(&$this, 'delete_joo_stats_in_wp'),2,1);
+			//If I delete all, I delete the imported Docs to download ... action=all only parameter
+			add_action('fgj2wp_post_empty_database', array(&$docs_manager, 'suppress_all_dm_data'),3,1);
 			//I only find the rsm categories the others Post will get 1 as category
 			add_filter('fgj2wp_get_categories', array(&$this, 'only_rsm_categories'));
 			//the next function will be executed first for the tag fgj2wp_pre_insert_post and receives 2 parameters!!!
