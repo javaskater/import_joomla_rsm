@@ -47,6 +47,8 @@ if ( class_exists('fgj2wp', false) ) {
 			add_filter('fgj2wp_get_posts_add_extra_cols', array(&$this, 'add_info_user_and_stats_to_posts'));
 			//Create WP USers with the same ID as Joo Users and store the generated Password in a usermeta
 			add_action('fgj2wp_pre_import', array(&$this, 'import_joo_users_in_wp'),1);
+			//Imports Joo Reossitry containers and files as DM Categories and Posts
+			add_action('fgj2wp_pre_import', array(&$docs_manager, 'import_joo_remository_in_wp_dm'),2);
 			//If I delete all, I delete the imported Joomla users ... action=all only parameter
 			add_action('fgj2wp_post_empty_database', array(&$this, 'delete_joo_users_in_wp'),1,1);
 			//If I delete all, I delete the imported Joomla users ... action=all only parameter
@@ -68,6 +70,8 @@ if ( class_exists('fgj2wp', false) ) {
 			add_filter('fgj2wp_pre_insert_post', array(&$this, 'replace_joo_maps_in_posts'),5,2);
 			//this function will be called after to unescape the simple and double quotes !!!!
 			add_filter('fgj2wp_pre_insert_post', array(&$this, 'unescape_wp_post_content_before_insertion'),6,2);
+			//this function will be called after to replace the Joo Remository Short code  with the WPDM shortcode ...
+			add_filter('fgj2wp_pre_insert_post', array(&$docs_manager, 'replace_joo_quickdown_links_in_posts'),7,2);
 			//after the post has been inserted we take care of linking the attachments to the parent post !!!
 			add_action('fgj2wp_post_insert_post', array(&$this, 'link_attachment_to_parent_post'),1,2);
 			//after the post has been inserted we take care getting the users stats from Joomla !!!
