@@ -258,6 +258,7 @@ SQL;
 				$meta_physicalfile_value = null;
 				$filename = $joo_rem_doc['filename'];
 				$ext = pathinfo($filename, PATHINFO_EXTENSION);
+				$filename_bis = basename($filename,'.'.$ext).'.'.$joo_rem_doc['id'].'.'.$ext; //somteimes Remository used that kind of filename instaed the first one!!!
 				$icon_dm = null;
 				if ($ext == 'pdf'){ //TODO peut être mettre le raccourci [url]
 					$icon_dm = $this->site_url.'/wp-content/plugins/download-manager/file-type-icons/pdf.png';
@@ -267,10 +268,13 @@ SQL;
 					$icon_dm = $this->site_url.'/wp-content/plugins/download-manager/file-type-icons/xlsx_win.png';
 				}
 				$joo_remdir = $joo_rem_doc['dirname'];
-				$full_rempath = $joo_remdir."/".$filename;
 				$dest_full_path = $this->download_directory."/".$filename;
-				if(file_exists($full_rempath) && copy($full_rempath,$dest_full_path)){
-					$meta_physicalfile_value = serialize(array($filename));
+				if(file_exists($joo_remdir."/".$filename)){ 
+					copy($joo_remdir."/".$filename,$dest_full_path);
+					$meta_physicalfile_array = array($filename); //it will be serialized by the update_post_meta itself !!!
+				}else if(file_exists($joo_remdir."/".$filename_bis)){ 
+					copy($joo_remdir."/".$filename_bis,$dest_full_path);
+					$meta_physicalfile_array = array($filename); //it will be serialized by the update_post_meta itself !!!
 				}else{
 					$this->caller->display_admin_error(sprintf('ERROR:  file (%s) does not exist or cannot be copied to (%s) !!!',$full_rempath,$dest_full_path));
 					$meta_physicalfile_value = null;
@@ -306,9 +310,9 @@ SQL;
 						'_edit_last' => $author_id,
 						'_edit_lock' => $insert_date->getTimestamp().':'.$author_id, //TODO Voir ss'il s'agit d'un timestamps + ID du user javaskater
 						'_statz_count' => 1,
-						'__wpdm_access' => serialize(array('guest')),
+						'__wpdm_access' => array('guest'), //it will be serialized by the update_post_meta itself !!!
 						'__wpdm_download_count' => $joo_rem_doc['downloads'], //TODO récupérer les download de la requête Joomla !!!
-						'__wpdm_files' => $meta_physicalfile_value,
+						'__wpdm_files' => $meta_physicalfile_array, //it will be serialized by the update_post_meta itself !!!
 						'__wpdm_icon' => $icon_dm,
 						'__wpdm_legacy_id' => null,
 						'__wpdm_link_label' => null,
@@ -330,7 +334,10 @@ SQL;
 				// to check it http://wordpress.stackexchange.com/questions/11141/how-to-catch-what-to-do-with-a-wp-error-object
 				if (!is_wp_error($new_post_id_or_wp_error) ){
 					foreach ($to_import['post_meta'] as $meta_key => $meta_value) {
-						add_post_meta($new_post_id, $meta_key, $meta_value, true);
+						$new_meta_id_or_wp_error = update_post_meta($new_post_id_or_wp_error, $meta_key, $meta_value, true) || add_post_meta($new_post_id_or_wp_error, $meta_key, $meta_value);
+						if (is_wp_error($new_meta_id_or_wp_error) ){
+							$this->caller->display_admin_error(sprintf('ERROR: The Meta tuple (%s=>%s) for the Joomla Rem File (%s) can not be added reason (%s) !!!',$meta_key,$meta_value,$joo_rem_doc['realname'],join(" | ",$new_meta_id_or_wp_error->get_error_messages())));
+						}
 					}
 					$to_import['status']['post_id'] = $new_post_id_or_wp_error;
 					$to_import['status']['imported'] = true;
@@ -359,7 +366,7 @@ SQL;
 			if(sizeof($found_pattern_joo_quickdown) > 1){
 				$joo_id_link = $found_pattern_joo_quickdown[1];
 				foreach($this->download_files as $df){
-					if($df['joo_file']['id'] = $joo_id_link){
+					if($df['joo_file']['id'] == $joo_id_link){
 						$translated_code = '[wpdm_package id=\''.$df['status']['post_id'].'\']';
 						break;
 					}
