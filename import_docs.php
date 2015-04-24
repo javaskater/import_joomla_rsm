@@ -83,7 +83,6 @@ SQL;
 					$fichiers_names = $wpdb->get_col($sql_file_path_query);
 					if ( $fichiers_names )
 					{
-						echo "List of {$meta_key3_value}(s), sorted by {$meta_key1}, {$meta_key2}";
 						foreach ( $fichiers_names as $file_path_serialized ){
 							$file_path_array =  unserialize($file_path_serialized);
 							if($file_path_array && len($file_path_array) > 0){
@@ -180,15 +179,15 @@ SQL;
 		 */
 		public function import_joo_remository_in_wp_dm(){
 			global $joomla_db;
-			$joo_prefix = $this->plugin_options['prefix'];
+			$joo_prefix = $this->caller->plugin_options['prefix'];
 			$joo_remository_containers = array();
-			$sql = "SELECT id, parent_id, name, alias, description, filepath, filetype, filetitle, description FROM " . $joo_prefix . "downloads_containers WHERE name NOT LIKE %Exemple%";
+			$sql = "SELECT id, name, alias, description, filepath FROM " . $joo_prefix . "downloads_containers WHERE name NOT LIKE '%Exemple%'";
 			$query = $joomla_db->query($sql);
 			if ( is_object($query) ) {
 				foreach ( $query as $row ) {
 					$joo_remository_containers[] = array(
 							'id'       => $row['id'],
-							'parent_id'     => $row['parent_id'],
+							'parent_id'     => 0,
 							'name' => $row['name'],
 							'slug' => sanitize_title($row['name']),
 							'alias'    => $row['alias'],
@@ -209,7 +208,7 @@ SQL;
 						
 					// Insert the category https://codex.wordpress.org/Function_Reference/wp_insert_category
 					$this->download_categories[] = array(
-						'joo_cont' => &$joo_rem_cont,
+						'joo_cont' => $joo_rem_cont,
 						'content' => array(
 							'cat_name' 				=> $joo_rem_cont['name'],
 							'category_description'	=> $joo_rem_cont['description'],
@@ -252,7 +251,7 @@ SQL;
 					);
 				}
 			}
-			$this->display_admin_notice(sprintf('%d joomla remository files found we must insert them...', count($joo_remository_docs)));
+			$this->caller->display_admin_notice(sprintf('%d joomla remository files found we must insert them...', count($joo_remository_docs)));
 			$posts_count = 0;
 			foreach ( $joo_remository_docs as $joo_rem_doc ){
 				//copy the physical file if exists:
@@ -260,7 +259,7 @@ SQL;
 				$filename = $joo_rem_doc['filename'];
 				$ext = pathinfo($filename, PATHINFO_EXTENSION);
 				$icon_dm = null;
-				if (ext == 'pdf'){
+				if ($ext == 'pdf'){ //TODO peut être mettre le raccourci [url]
 					$icon_dm = $this->site_url.'/wp-content/plugins/download-manager/file-type-icons/pdf.png';
 				} else if($ext == 'doc' || $ext == 'docx'){
 					$icon_dm = $this->site_url.'/wp-content/plugins/download-manager/file-type-icons/docx.png';
@@ -278,9 +277,12 @@ SQL;
 				}
 				$post_categories = array();
 				foreach ($this->download_categories as $cat){
-					if ($cat['joo_cont']['id'] == $joo_rem_doc['container_id']){
-						$post_categories[] = $cat['status']['term_id'];
+					if ($cat['joo_cont']['id'] == $joo_rem_doc['containerid']){
+						$post_categories[] = $cat['status']['term_id']; //TODO le 6 na pas été trouvé !!! vérifier que cat change à cahque ffois !!!!
 					}
+				}
+				if (count($post_categories) == 0){
+					$post_categories[] = 1; //1 means unclassified in the terms/categories table
 				}
 				$author_id = 1;
 				if($this->author){
@@ -289,12 +291,12 @@ SQL;
 				// Insert the dm file which is a  Post of a specific type
 				$insert_date = new DateTime($joo_rem_doc['publish_from']);
 				$this->download_files[] = array(
-					'joo_file' => &$joo_rem_doc,
+					'joo_file' => $joo_rem_doc,
 					'post' => array( //TOD à adapter
 						'post_category'		=> $post_categories,
 						'post_author'		=> $author_id,
 						'post_content'		=> $joo_rem_doc['description'],
-						'post_date'			=> $insert_date,
+						'post_date'			=> date('Y-m-d H:i:s',$insert_date->getTimestamp()),
 						'post_status'		=> 'publish',
 						'post_title'		=> $joo_rem_doc['filetitle'],
 						'post_name'			=> sanitize_title($joo_rem_doc['filetitle']),
@@ -324,16 +326,17 @@ SQL;
 				 * The part of code has been inspired by the lines 983 to 1009 of fd-joomla-to-wordpress.php !!!!
 				 */
 				// Insert the post	https://codex.wordpress.org/Function_Reference/wp_insert_post
-				$new_post_id = wp_insert_post($to_import['post'],$wp_error);
-				if ($new_post_id){
+				$new_post_id_or_wp_error = wp_insert_post($to_import['post'],true); //returns a WP_Error Object if there ids a problem with the insertion otherwise the new post_id
+				// to check it http://wordpress.stackexchange.com/questions/11141/how-to-catch-what-to-do-with-a-wp-error-object
+				if (!is_wp_error($new_post_id_or_wp_error) ){
 					foreach ($to_import['post_meta'] as $meta_key => $meta_value) {
 						add_post_meta($new_post_id, $meta_key, $meta_value, true);
 					}
-					$to_import['status']['post_id'] = $new_post_id;
+					$to_import['status']['post_id'] = $new_post_id_or_wp_error;
 					$to_import['status']['imported'] = true;
 					$posts_count++;
 				}else{
-					$this->caller->display_admin_error(sprintf('ERROR:  This Joomla Remository file (%s) can not be added reason (%s) !!!',$joo_rem_doc['realname'],$wp_error));
+					$this->caller->display_admin_error(sprintf('ERROR:  This Joomla Remository file (%s) can not be added reason (%s) !!!',$joo_rem_doc['realname'],join(" | ",$new_post_id_or_wp_error->get_error_messages())));
 				}
 			}
 			$this->caller->display_admin_notice(sprintf('INFO:  (%d) out of (%d) Joomla Remository Files have been translated into WP Posts',$posts_count,count($joo_remository_docs)));

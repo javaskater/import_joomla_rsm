@@ -9,6 +9,8 @@
  *  */
 define( 'JOORSM__PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 require_once( JOORSM__PLUGIN_DIR . '/admin/menu.php' );
+require_once( JOORSM__PLUGIN_DIR . '/import_docs.php');
+
 RsmImportMenu::init();
 if ( class_exists('fgj2wp', false) ) {
 	class JooRsm extends fgj2wp {
