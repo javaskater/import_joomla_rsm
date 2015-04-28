@@ -179,6 +179,7 @@ SQL;
 		 */
 		public function import_joo_remository_in_wp_dm(){
 			global $joomla_db;
+			global $wpdb;
 			$joo_prefix = $this->caller->plugin_options['prefix'];
 			$joo_remository_containers = array();
 			$sql = "SELECT id, name, alias, description, filepath FROM " . $joo_prefix . "downloads_containers WHERE name NOT LIKE '%Exemple%'";
@@ -297,7 +298,8 @@ SQL;
 				$this->download_files[] = array(
 					'joo_file' => $joo_rem_doc,
 					'post' => array( //TOD à adapter
-						'post_category'		=> $post_categories,
+						'post_category'		=> $post_categories, //works only for standard categories
+						'tags_input'	=> $post_categories, //works only for standard categories
 						'post_author'		=> $author_id,
 						'post_content'		=> $joo_rem_doc['description'],
 						'post_date'			=> date('Y-m-d H:i:s',$insert_date->getTimestamp()),
@@ -333,6 +335,33 @@ SQL;
 				$new_post_id_or_wp_error = wp_insert_post($to_import['post'],true); //returns a WP_Error Object if there ids a problem with the insertion otherwise the new post_id
 				// to check it http://wordpress.stackexchange.com/questions/11141/how-to-catch-what-to-do-with-a-wp-error-object
 				if (!is_wp_error($new_post_id_or_wp_error) ){
+					//Because we are not the native post type, we must use: https://codex.wordpress.org/Function_Reference/wp_set_object_terms#Setting_a_Post.27s_Categories
+					$terms_ids = array_map( 'intval', $to_import['post']['post_category']);
+					$terms_ids = array_unique( $terms_ids );
+					//First Solution !!!
+					$new_categories_or_wp_error = wp_set_object_terms($new_post_id_or_wp_error, $terms_ids, 'wpdmcategory');
+					if (is_wp_error($new_categories_or_wp_error) ){
+						$this->caller->display_admin_error(sprintf('ERROR: The categores (%s) for the Joomla Rem File (%s) or WP Post (%d) could not be added reason (%s) !!!',join(';',$terms_ids),$joo_rem_doc['realname'],$new_post_id_or_wp_error,join(" | ",$new_categories_or_wp_error->get_error_messages())));
+					}
+					//Other Solution We can do a traditional wpdb->query
+					/*foreach ($terms_ids as $term_id){
+						$inserted = $wpdb->query( $wpdb->prepare( 
+							"
+								INSERT INTO $wpdb->term_relationships
+								( object_id, term_taxonomy_id, term_order )
+								VALUES ( %d, %d, %d )
+							", 
+						        array(
+								$new_post_id_or_wp_error, 
+								$term_id, 
+								0
+							) 
+						) );
+						if (!$inserted ){
+							$this->caller->display_admin_error(sprintf('ERROR: The category (%d) for the Joomla Rem File (%s) or WP Post (%d) could not be added reason (%s) !!!',$term_id,$joo_rem_doc['realname'],$new_post_id_or_wp_error,join(" | ",$new_categories_or_wp_error->get_error_messages())));
+						}
+						
+					}*/
 					foreach ($to_import['post_meta'] as $meta_key => $meta_value) {
 						$new_meta_id_or_wp_error = update_post_meta($new_post_id_or_wp_error, $meta_key, $meta_value, true) || add_post_meta($new_post_id_or_wp_error, $meta_key, $meta_value);
 						if (is_wp_error($new_meta_id_or_wp_error) ){

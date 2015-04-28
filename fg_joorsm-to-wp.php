@@ -49,8 +49,8 @@ if ( class_exists('fgj2wp', false) ) {
 			add_filter('fgj2wp_get_posts_add_extra_cols', array(&$this, 'add_info_user_and_stats_to_posts'));
 			//Create WP USers with the same ID as Joo Users and store the generated Password in a usermeta
 			add_action('fgj2wp_pre_import', array(&$this, 'import_joo_users_in_wp'),1);
-			//Imports Joo Reossitry containers and files as DM Categories and Posts
-			add_action('fgj2wp_pre_import', array(&$docs_manager, 'import_joo_remository_in_wp_dm'),2);
+			//Imports Joo Reossitry containers and files as DM Categories and Posts We let the parent import the main categories, before importing our ones !!!
+			add_action('fgj2wp_pre_import_posts', array(&$docs_manager, 'import_joo_remository_in_wp_dm'),2);
 			//If I delete all, I delete the imported Joomla users ... action=all only parameter
 			add_action('fgj2wp_post_empty_database', array(&$this, 'delete_joo_users_in_wp'),1,1);
 			//If I delete all, I delete the imported Joomla users ... action=all only parameter
