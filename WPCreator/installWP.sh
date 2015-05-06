@@ -39,11 +39,14 @@ unzip-strip() (
 function install_from_gitHub {
 	url=$1
 	cible=$2
-	nom_plugin=echo $(basename ${url} .git)
+	nom_plugin=$(basename ${url} .git)
 	git_exe=$(which git)
 	rep_actuel=$(pwd)
+	echo "on change pour $cible"
 	cd $cible
-	git_exe clone --depth=1 ${url} && rm -rf ${nom_plugin}/.git
+	echo "on clone ${url} pour créer ${cible}/${nom_plugin}"
+	$git_exe clone --depth=1 ${url} && rm -rf ${nom_plugin}/.git
+	echo "on revient ver $rep_actuel"
 	cd $rep_actuel
 }
 
@@ -108,6 +111,7 @@ function main {
 		patch < "${WD}/wp-config.AND.patch"
 	fi
 	cd $WD
+	rm -rf $DOWNLOAD
 }
 
 log_file="$(basename $0)_$(date +"%d-%m-%Y_%T").log"
