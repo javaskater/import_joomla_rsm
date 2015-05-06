@@ -39,23 +39,18 @@ unzip-strip() (
 function install_from_gitHub {
 	url=$1
 	cible=$2
-	nom_plugin=$(basename ${url%%/zip/master})
-	archive_a_recuperer="${nom_plugin}.zip"
-	if [[ ! -f "$DOWNLOAD/$archive_a_recuperer" ]]; then
-		#CURL_PROXY_OPTION="--proxy dgproxy.appli.dgi:8080"
-		curl_exe=$(which curl)
-		$curl_exe $CURL_PROXY_OPTION $url -o "$DOWNLOAD/$archive_a_recuperer"
-	fi
-	if [[ -f "$DOWNLOAD/$archive_a_recuperer" ]]; then
-		echo "j'installe $archive_a_recuperer vers $cible"
-		unzip-strip "$DOWNLOAD/$archive_a_recuperer" "$cible/$nom_plugin"
-	fi
+	nom_plugin=echo $(basename ${url} .git)
+	git_exe=$(which git)
+	rep_actuel=$(pwd)
+	cd $cible
+	git_exe clone --depth=1 ${url} && rm -rf ${nom_plugin}/.git
+	cd $rep_actuel
 }
 
 function main {
 	export DOWNLOAD="/home/jpmena/workspace/RSM/test/tmp"
 	export WP_HOME="/home/jpmena/workspace/RSM"
-	export WP_URL="https://fr.wordpress.org/wordpress-4.1.1-fr_FR.zip"
+	export WP_URL="https://fr.wordpress.org/wordpress-4.2.1-fr_FR.zip"
 	export THEMES_LIST_CSV="listeThemes.csv"
 	export THEMES_GITHUBLIST_CSV="listeGitThemes.csv"
 	export PLUGINS_LIST_CSV="listePlugins.csv"
@@ -108,9 +103,9 @@ function main {
 		cp -pv wp-config-sample.php wp-config.TESTAND.php
 		patch < "${WD}/wp-config.TESTAND.patch"
 	fi
-	if [[ -f "${WD}/wp-config.ECOLEAND.patch" ]]; then 
-		cp -pv wp-config-sample.php wp-config.ECOLEAND.php
-		patch < "${WD}/wp-config.ECOLEAND.patch"
+	if [[ -f "${WD}/wp-config.AND.patch" ]]; then 
+		cp -pv wp-config-sample.php wp-config.AND.php
+		patch < "${WD}/wp-config.AND.patch"
 	fi
 	cd $WD
 }

@@ -62,8 +62,8 @@
 +define('WPLANG', 'fr_FR');
 +
 +/* http://codex.wordpress.org/Changing_The_Site_URL */
-+define('WP_HOME','http://ecole.rsmontreuil.fr');
-+define('WP_SITEURL','http://ecole.rsmontreuil.fr');
++define('WP_HOME','http://rsmontreuil.fr');
++define('WP_SITEURL','http://rsmontreuil.fr');
  /** 
   * Pour les développeurs : le mode deboguage de WordPress.
   * 
